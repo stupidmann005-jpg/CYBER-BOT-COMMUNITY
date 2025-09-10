@@ -47,78 +47,203 @@ module.exports. run = function({ api, event, args, getText }) {
  const { autoUnsend, delayUnsend } = global.configModule[this.config.name];
  const prefix = (threadSetting.hasOwnProperty("PREFIX")) ? threadSetting.PREFIX : global.config.PREFIX;
 if (args[0] == "all") {
-    const command = commands.values();
-    var group = [], msg = "";
-    for (const commandConfig of command) {
-      if (!group.some(item => item.group.toLowerCase() == commandConfig.config.commandCategory.toLowerCase())) group.push({ group: commandConfig.config.commandCategory.toLowerCase(), cmds: [commandConfig.config.name] });
-      else group.find(item => item.group.toLowerCase() == commandConfig.config.commandCategory.toLowerCase()).cmds.push(commandConfig.config.name);
+    // Create categorized command list as shown in user's input
+    const categories = {
+      "IMAGE": [],
+      "AI": [],
+      "GENERAL": [],
+      "IMAGE GEN": [],
+      "GAME": [],
+      "ADMIN": [],
+      "BOX CHAT": [],
+      "OWNER": [],
+      "FUNNY": [],
+      "UTILITY": [],
+      "MEDIA": [],
+      "ANIME": [],
+      "ECONOMY": [],
+      "LOVE": [],
+      "RANK": [],
+      "TOOLS": [],
+      "MUSIC": [],
+      "CUSTOM": []
+    };
+    
+    // Map command categories to our predefined categories
+    const categoryMapping = {
+      "image": "IMAGE",
+      "ai": "AI",
+      "general": "GENERAL",
+      "games": "GAME",
+      "game": "GAME",
+      "admin": "ADMIN",
+      "box": "BOX CHAT",
+      "group": "BOX CHAT",
+      "owner": "OWNER",
+      "system": "OWNER",
+      "funny": "FUNNY",
+      "fun": "FUNNY",
+      "utility": "UTILITY",
+      "media": "MEDIA",
+      "anime": "ANIME",
+      "economy": "ECONOMY",
+      "love": "LOVE",
+      "rank": "RANK",
+      "tools": "TOOLS",
+      "music": "MUSIC",
+      "custom": "CUSTOM"
+    };
+    
+    // Categorize commands
+    for (const cmd of commands.values()) {
+      const category = cmd.config.commandCategory.toLowerCase();
+      const mappedCategory = categoryMapping[category] || "GENERAL";
+      
+      if (categories[mappedCategory]) {
+        categories[mappedCategory].push(cmd.config.name);
+      } else {
+        categories["GENERAL"].push(cmd.config.name);
+      }
     }
-    group.forEach(commandGroup => msg += `❄️ ${commandGroup.group.charAt(0).toUpperCase() + commandGroup.group.slice(1)} \n${commandGroup.cmds.join(' • ')}\n\n`);
+    
+    // Build the formatted message
+    let msg = "";
+    
+    for (const [category, cmds] of Object.entries(categories)) {
+      if (cmds.length > 0) {
+        msg += `╭─────⭓ 𝐈${category.slice(1)} \n`;
+        
+        // Format commands in groups of 2-3 per line
+        let cmdLines = [];
+        let line = "";
+        let count = 0;
+        
+        for (const cmd of cmds.sort()) {
+          if (count === 0) line = "│";
+          line += `✧${cmd} `;
+          count++;
+          
+          if (count === 3 || cmds.indexOf(cmd) === cmds.length - 1) {
+            cmdLines.push(line);
+            count = 0;
+          }
+        }
+        
+        msg += cmdLines.join("\n") + "\n╰────────────⭓ \n\n";
+      }
+    }
 
-    return axios.get('https://loidsenpaihelpapi.miraiandgoat.repl.co').then(res => {
-    let ext = res.data.data.substring(res.data.data.lastIndexOf(".") + 1);
-      let admID = "61551846081032";
-
-      api.getUserInfo(parseInt(admID), (err, data) => {
+    // Get bot owner info
+    let admID = "61551846081032";
+    
+    api.getUserInfo(parseInt(admID), (err, data) => {
       if(err){ return console.log(err)}
-     var obj = Object.keys(data);
-    var firstname = data[obj].name.replace("@", "");
-    let callback = function () {
-        api.sendMessage({ body:`✿🄲🄾🄼🄼🄰🄽🄳 🄻🄸🅂🅃✿\n\n` + msg + `✿══════════════✿\n│𝗨𝘀𝗲 ${prefix}help [Name?]\n│𝗨𝘀𝗲 ${prefix}help [Page?]\n│𝗡𝗔𝗠𝗘 𝗢𝗪𝗡𝗘𝗥 : │Ullash ッ\n│𝗧𝗢𝗧𝗔𝗟 :  ${commands.size}\n————————————`, mentions: [{
-                           tag: firstname,
-                           id: admID,
-                           fromIndex: 0,
-                 }],
-            attachment: fs.createReadStream(__dirname + `/cache/472.${ext}`)
-        }, event.threadID, (err, info) => {
-        fs.unlinkSync(__dirname + `/cache/472.${ext}`);
-        if (autoUnsend == false) {
-            setTimeout(() => {
-                return api.unsendMessage(info.messageID);
-            }, delayUnsend * 1000);
-        }
-        else return;
-    }, event.messageID);
-        }
-         request(res.data.data).pipe(fs.createWriteStream(__dirname + `/cache/472.${ext}`)).on("close", callback);
-     })
-      })
+      var obj = Object.keys(data);
+      var firstname = data[obj].name.replace("@", "");
+      
+      // Add footer
+      const footer = `╭─ [ YOUR SPIDER BOT] \n╰‣ Admin: ⚣︎ NOBITA 🎀 \n╰‣ Total commands: ${commands.size} \n╰‣ 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤  \n\`https://www.facebook.com/share/16yf6kDZ7o/\`  \n\n⭔Type !help <command> to learn usage.`;
+      
+      // Send the message
+      api.sendMessage({ 
+        body: msg + footer, 
+        mentions: [{
+          tag: firstname,
+          id: admID,
+          fromIndex: 0,
+        }]
+      }, event.threadID, event.messageID);
+    });
+    return;
 };
  if (!command) {
   const arrayInfo = [];
   const page = parseInt(args[0]) || 1;
-    const numberOfOnePage = 15;
-    let i = 0;
-    let msg = "";
+  const numberOfOnePage = 15;
+  let i = 0;
+  let msg = "";
 
-    for (var [name, value] of (commands)) {
-      name += ``;
-      arrayInfo.push(name);
+  for (var [name, value] of (commands)) {
+    name += ``;
+    arrayInfo.push(name);
+  }
+
+  arrayInfo.sort((a, b) => a.data - b.data);  
+  const first = numberOfOnePage * page - numberOfOnePage;
+  i = first;
+  const helpView = arrayInfo.slice(first, first + numberOfOnePage);
+
+  // Format commands in groups of 3 per line with the new style
+  let cmdLines = [];
+  let line = "";
+  let count = 0;
+  
+  for (const cmd of helpView) {
+    if (count === 0) line = "│";
+    line += `✧${cmd} `;
+    count++;
+    
+    if (count === 3 || helpView.indexOf(cmd) === helpView.length - 1) {
+      cmdLines.push(line);
+      count = 0;
     }
-
-    arrayInfo.sort((a, b) => a.data - b.data);  
-const first = numberOfOnePage * page - numberOfOnePage;
-   i = first;
-   const helpView = arrayInfo.slice(first, first + numberOfOnePage);
-
-
-   for (let cmds of helpView) msg += `•—»[ ${cmds} ]«—•\n`;
-    const siu = `╭──────•◈•──────╮\n |        𝗜𝘀𝗹𝗮𝗺𝗶𝗰𝗸 𝗰𝗵𝗮𝘁 𝗯𝗼𝘁 \n |   🄲🄾🄼🄼🄰🄽🄳 🄻🄸🅂🅃       \n╰──────•◈•──────╯`;
-const text = `╭──────•◈•──────╮\n│𝗨𝘀𝗲 ${prefix}help [Name?]\n│𝗨𝘀𝗲 ${prefix}help [Page?]\n│𝗡𝗔𝗠𝗘 𝗢𝗪𝗡𝗘𝗥 : │ Ullash ッ\n│𝗧𝗢𝗧𝗔𝗟 : [${arrayInfo.length}]\n│📛🄿🄰🄶🄴📛 :  [${page}/${Math.ceil(arrayInfo.length/numberOfOnePage)}]\n╰──────•◈•──────╯`; 
-    var link = [
-"https://i.imgur.com/HPaSlBu.jpeg", "https://i.imgur.com/HPaSlBu.jpeg", "https://i.imgur.com/WXQIgMz.jpeg", "https://i.postimg.cc/QdgH08j6/Messenger-creation-C2-A39-DCF-A8-E7-4-FC7-8715-2559476-FEEF4.gif",
-"https://i.imgur.com/WXQIgMz.jpeg",
-"https://i.imgur.com/ybM9Wtr.jpeg",
-"https://i.imgur.com/HPaSlBu.jpeg",
-    ]
-     var callback = () => api.sendMessage({ body: siu + "\n\n" + msg  + text, attachment: fs.createReadStream(__dirname + "/cache/loidbutter.jpg")}, event.threadID, () => fs.unlinkSync(__dirname + "/cache/loidbutter.jpg"), event.messageID);
-    return request(encodeURI(link[Math.floor(Math.random() * link.length)])).pipe(fs.createWriteStream(__dirname + "/cache/loidbutter.jpg")).on("close", () => callback());
+  }
+  
+  msg = `╭─────⭓ 𝐂𝐎𝐌𝐌𝐀𝐍𝐃𝐒 \n${cmdLines.join("\n")}\n╰────────────⭓ \n\n`;
+  
+  // Add footer with pagination
+  const footer = `╭─ [ YOUR SPIDER BOT] \n╰‣ Admin: ⚣︎ NOBITA 🎀 \n╰‣ Total commands: ${arrayInfo.length} \n╰‣ Page: ${page}/${Math.ceil(arrayInfo.length/numberOfOnePage)} \n╰‣ 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤  \n\`https://www.facebook.com/share/16yf6kDZ7o/\`  \n\n⭔Type !help <command> to learn usage.`;
+  
+  // Get bot owner info
+  let admID = "61551846081032";
+  
+  api.getUserInfo(parseInt(admID), (err, data) => {
+    if(err){ return console.log(err)}
+    var obj = Object.keys(data);
+    var firstname = data[obj].name.replace("@", "");
+    
+    // Send the message
+    api.sendMessage({ 
+      body: msg + footer, 
+      mentions: [{
+        tag: firstname,
+        id: admID,
+        fromIndex: 0,
+      }]
+    }, event.threadID, event.messageID);
+  });
+  return;
  }
 const leiamname = getText("moduleInfo", command.config.name, command.config.description, `${(command.config.usages) ? command.config.usages : ""}`, command.config.commandCategory, command.config.cooldowns, ((command.config.hasPermssion == 0) ? getText("user") : (command.config.hasPermssion == 1) ? getText("adminGroup") : getText("adminBot")), command.config.credits);
 
-  var link = [
-"https://i.postimg.cc/QdgH08j6/Messenger-creation-C2-A39-DCF-A8-E7-4-FC7-8715-2559476-FEEF4.gif",
-  ]
-    var callback = () => api.sendMessage({ body: leiamname, attachment: fs.createReadStream(__dirname + "/cache/loidbutter.jpg")}, event.threadID, () => fs.unlinkSync(__dirname + "/cache/loidbutter.jpg"), event.messageID);
-return request(encodeURI(link[Math.floor(Math.random() * link.length)])).pipe(fs.createWriteStream(__dirname + "/cache/loidbutter.jpg")).on("close", () => callback());
+  // Format the command info in the new style
+  const commandInfo = `╭─────⭓ 𝐂𝐎𝐌𝐌𝐀𝐍𝐃 𝐈𝐍𝐅𝐎 
+│✧Name: ${command.config.name}
+│✧Description: ${command.config.description}
+│✧Usage: ${(command.config.usages) ? command.config.usages : ""}
+│✧Category: ${command.config.commandCategory}
+│✧Cooldown: ${command.config.cooldowns} seconds
+│✧Permission: ${((command.config.hasPermssion == 0) ? getText("user") : (command.config.hasPermssion == 1) ? getText("adminGroup") : getText("adminBot"))}
+│✧Credits: ${command.config.credits}
+╰────────────⭓`;
+
+  // Get bot owner info
+  let admID = "61551846081032";
+  
+  api.getUserInfo(parseInt(admID), (err, data) => {
+    if(err){ return console.log(err)}
+    var obj = Object.keys(data);
+    var firstname = data[obj].name.replace("@", "");
+    
+    // Send the message
+    api.sendMessage({ 
+      body: commandInfo, 
+      mentions: [{
+        tag: firstname,
+        id: admID,
+        fromIndex: 0,
+      }]
+    }, event.threadID, event.messageID);
+  });
+  return;
 };
