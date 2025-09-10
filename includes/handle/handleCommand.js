@@ -52,6 +52,10 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     }
     const [matchedPrefix] = body.match(prefixRegex),
       args = body.slice(matchedPrefix.length).trim().split(/ +/);
+    
+    // If there's only the prefix with no command text, don't respond
+    if (args.length === 0 || args[0] === '') return;
+    
     commandName = args.shift().toLowerCase();
     var command = commands.get(commandName);
     if (!command) {
