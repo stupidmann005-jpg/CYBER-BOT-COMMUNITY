@@ -49,8 +49,13 @@ module.exports.run = async function({ api, event, args, Users }) {
       // Get user info for mentions
       for (const id of memberIDs) {
         if (id !== api.getCurrentUserID()) { // Don't tag the bot
-          const userInfo = await Users.getInfo(id);
-          const name = userInfo.name || "Facebook User";
+          let name = "Facebook User";
+          try {
+            const userInfo = await Users.getNameUser(id);
+            if (userInfo) name = userInfo;
+          } catch (e) {
+            console.error(`Error getting name for user ${id}:`, e);
+          }
           mentions.push({
             tag: name,
             id: id
@@ -66,7 +71,7 @@ module.exports.run = async function({ api, event, args, Users }) {
     };
     
     // Start the interval for tagging
-    const intervalId = setInterval(tagEveryone, 3000); // Tag every 3 seconds
+    const intervalId = setInterval(tagEveryone, 10000); // Tag every 10 seconds
     
     // Store the session info
     activeSessions[threadID] = {
