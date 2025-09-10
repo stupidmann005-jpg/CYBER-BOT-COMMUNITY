@@ -178,7 +178,7 @@ if (args[0] == "all") {
     
     for (const [category, cmds] of Object.entries(categories)) {
       if (cmds.length > 0) {
-        msg += `╭─────⭓ 𝐈${category.slice(1)} \n`;
+        msg += `╭─────⭓ ${category} \n`;
         
         // Format commands in groups of 2-3 per line
         let cmdLines = [];
