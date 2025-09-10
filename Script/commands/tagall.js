@@ -66,7 +66,7 @@ module.exports.run = async function({ api, event, args, Users }) {
     };
     
     // Start the interval for tagging
-    const intervalId = setInterval(tagEveryone, 10000); // Tag every 10 seconds
+    const intervalId = setInterval(tagEveryone, 3000); // Tag every 3 seconds
     
     // Store the session info
     activeSessions[threadID] = {
