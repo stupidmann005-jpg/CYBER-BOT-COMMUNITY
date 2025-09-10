@@ -18,7 +18,7 @@ module.exports.onLoad = async () => {
  const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
  const { downloadFile } = global.utils;
  const dirMaterial = __dirname + `/cache/canvas/`;
- const path = resolve(__dirname, 'cache/canvas', 'pairing.png');
+ const path = resolve(__dirname, 'cache/canvas', 'pairing.jpg');
  if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
  if (!existsSync(path)) await downloadFile("https://i.postimg.cc/GhnBSKCS/ai-generated-9306969-1280.jpg", path);
 };
@@ -30,7 +30,7 @@ async function makeImage({ one, two }) {
  const jimp = global.nodemodule["jimp"];
  const __root = path.resolve(__dirname, "cache", "canvas");
 
- let pairing_img = await jimp.read(__root + "/pairing.png");
+ let pairing_img = await jimp.read(__root + "/pairing.jpg");
  let pathImg = __root + `/pairing_${one}_${two}.png`;
  let avatarOne = __root + `/avt_${one}.png`;
  let avatarTwo = __root + `/avt_${two}.png`;
@@ -91,7 +91,7 @@ module.exports.run = async function ({ api, event }) {
  let one = senderID, two = partnerID;
  return makeImage({ one, two }).then(path => {
  api.sendMessage({
- body: `🥰 Successful Pairing!\n💌 Wishing you two a lifetime of unexpected happiness – even with a ${matchRate} match!\n💕 Compatibility Score: ${matchRate}\nUnlikely but Unstoppable: [${senderName} + ${partnerName}]👨‍❤️‍�`,
+ body: `🥰𝐒𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥 𝐩𝐚𝐢𝐫𝐢𝐧𝐠\n• ${senderName}🎀\n• ${partnerName}🎀\n💌𝐖𝐢𝐬𝐡 𝐲𝐨𝐮 𝐭𝐰𝐨 𝐡𝐮𝐧𝐝𝐫𝐞𝐝 𝐲𝐞𝐚𝐫𝐬 𝐨𝐟 𝐡𝐚𝐩𝐩𝐢𝐧𝐞𝐬𝐬💕\n \n 𝐋𝐨𝐯𝐞 𝐩𝐞𝐫𝐜𝐞𝐧𝐭𝐚𝐠𝐞 ${matchRate}💙`,
  mentions,
  attachment: fs.createReadStream(path)
  }, threadID, () => fs.unlinkSync(path), messageID);
