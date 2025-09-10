@@ -21,7 +21,7 @@ const keywordAudioMap = {
     "hi": { file: "v.mp3", exact: true },
     "bye": { file: "sub.mp3", exact: true, reaction: "👋" },
     "lol": { file: "dk.mp3", exact: false, reaction: "😂" },
-	"snake": { file: "snake.mp3", exact: false, reaction: "🐍" },
+	"🐍": { file: "snake.mp3", exact: false, reaction: "🐍" },
     // Add more keyword-audio pairs as needed
 };
 
