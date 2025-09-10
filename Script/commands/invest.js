@@ -200,7 +200,7 @@ module.exports.run = async function({ api, event, args, Currencies }) {
             const amount = parseInt(args[2]);
             
             if (isNaN(amount) || amount < option.minAmount) {
-                return api.sendMessage(`❌ Please enter a valid amount (minimum $${option.minAmount} for ${option.name}).", threadID, messageID);
+                return api.sendMessage(`❌ Please enter a valid amount (minimum $${option.minAmount} for ${option.name}).`, threadID, messageID);
             }
             
             if (amount > walletBalance) {
