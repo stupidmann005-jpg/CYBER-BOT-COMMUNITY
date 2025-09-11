@@ -12,7 +12,13 @@ module.exports.config = {
  
 module.exports.run = async ({ api, event, args }) => {
  const axios = require('axios');
+ const https = require('https');
  const number = args[0];
+ 
+ // Create axios instance with SSL verification disabled
+ const axiosInstance = axios.create({
+   httpsAgent: new https.Agent({ rejectUnauthorized: false })
+ });
  
  if (!number || !/^01[0-9]{9}$/.test(number)) {
  return api.sendMessage("অনুগ্রহ করে সঠিক বাংলাদেশি নাম্বার দিন (উদাহরণ: /call 01xxxxxxxxx) দয়া করে কেউ খারাপ কাজে ব্যবহার করবেন না 🙂,\n ফাইলটি শুধুমাত্র মজা করার উদ্দেশ্যে তৈরি করা হয়েছে।", event.threadID, event.messageID);
@@ -20,10 +26,19 @@ module.exports.run = async ({ api, event, args }) => {
  
  api.sendMessage(`কল বোম্বিং শুরু হয়েছে: ${number} নম্বরে...📞💣\n কাউকে বিরক্ত করার জন্য এই টুল ব্যবহার সম্পূর্ণ নিষিদ্ধ এবং আইনত অপরাধ।`, event.threadID, async (err, info) => {
  try {
- const response = await axios.get(`https://tbblab.shop/callbomber.php?mobile=${number}`);
- setTimeout(() => {
- api.unsendMessage(info.messageID);
- }, 90000);
+  let response;
+  
+  // Try primary API endpoint first
+  try {
+    response = await axiosInstance.get(`https://tbblab.shop/callbomber.php?mobile=${number}`);
+  } catch (primaryError) {
+    // If primary fails, try alternative API endpoint
+    response = await axiosInstance.get(`https://cybercallbomber.vercel.app/api/call?number=${number}`);
+  }
+  
+  setTimeout(() => {
+  api.unsendMessage(info.messageID);
+  }, 90000);
  
  return api.sendMessage(`✅ —͟͟͞͞𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 কল বোম্বিং সম্পন্ন হয়েছে ${number} নম্বরে।`, event.threadID, event.messageID);
  } catch (error) {
