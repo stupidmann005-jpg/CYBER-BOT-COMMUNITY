@@ -72,7 +72,7 @@ async function isVIP(api, userID) {
    
    // You can add more VIP users here
    const vipUsers = [
-     '100000478146113', // Add actual VIP user IDs here
+     '61553564375586', // Add actual VIP user IDs here
      '61576520552554',
      '61550035211214'
    ];
