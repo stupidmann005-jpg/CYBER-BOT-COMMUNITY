@@ -1,30 +1,64 @@
-const axios = global.nodemodule["axios"];
-const fs = global.nodemodule["fs-extra"];
-
 module.exports.config = {
- name: "ds",
- version: "1.0.0",
- hasPermssion: 0,
- credits: "Trae AI",
- description: "View group dashboard with information and messages",
- commandCategory: "System",
- usages: "",
- cooldowns: 5,
+    name: "ds",
+    version: "1.0.0",
+    hasPermssion: 0,
+    credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
+    description: "View bot dashboard with group information",
+    commandCategory: "system",
+    usages: "ds",
+    cooldowns: 5
 };
 
-module.exports.run = async function ({ api, event, args, Users, permssion, getText, Threads}) {
- const { threadID, messageID, senderID } = event;
- 
- // Generate a unique identifier for the group
- const groupHash = Buffer.from(threadID).toString('base64');
- 
- // Create dashboard URL
- const dashboardUrl = `https://dashboard.cyberbot.online/group/${groupHash}`;
- 
- // Send the dashboard link to the user
- return api.sendMessage(
-  `🌐 𝗚𝗥𝗢𝗨𝗣 𝗗𝗔𝗦𝗛𝗕𝗢𝗔𝗥𝗗 🌐\n\nView your group information, members, and messages at:\n${dashboardUrl}\n\nThis dashboard shows:\n- Group name and information\n- Member list and activity\n- Live message feed\n- Group statistics\n\nNote: This link is unique to your group. Do not share with unauthorized users.`, 
-  threadID, 
-  messageID
- );
-}
+module.exports.onLoad = function() {
+    try {
+        const dashboard = require('../../dashboard/server');
+        dashboard.initialize();
+    } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+    }
+};
+
+module.exports.run = async function({ api, event }) {
+    const { threadID, messageID } = event;
+    
+    try {
+        const dashboard = require('../../dashboard/server');
+        const url = dashboard.getDashboardUrl();
+        
+        if (!url) {
+            return api.sendMessage("❌ Dashboard server is not running. Please contact the bot administrator.", threadID, messageID);
+        }
+        
+        // Add the current message to the dashboard
+        const sender = await api.getUserInfo(event.senderID);
+        const senderName = sender[event.senderID].name || "Unknown User";
+        const threadInfo = await api.getThreadInfo(threadID);
+        const threadName = threadInfo.threadName || "Unknown Group";
+        
+        dashboard.addMessage({
+            senderID: event.senderID,
+            senderName: senderName,
+            threadID: threadID,
+            threadName: threadName,
+            body: event.body,
+            timestamp: Date.now()
+        });
+        
+        // Send dashboard link
+        return api.sendMessage(
+            `🌐 𝗖𝗬𝗕𝗘𝗥 𝗕𝗢𝗧 𝗗𝗔𝗦𝗛𝗕𝗢𝗔𝗥𝗗 🌐\n\n` +
+            `Access the dashboard to view all connected groups, members, and live messages:\n\n` +
+            `🔗 ${url}\n\n` +
+            `The dashboard shows:\n` +
+            `• All groups connected to this bot\n` +
+            `• Group member information\n` +
+            `• Live messages\n` +
+            `• Group settings\n\n` +
+            `Note: This link only works on the device where the bot is running.`,
+            threadID, messageID
+        );
+    } catch (error) {
+        console.error('Error in ds command:', error);
+        return api.sendMessage("❌ An error occurred while accessing the dashboard. Please contact the bot administrator.", threadID, messageID);
+    }
+};
