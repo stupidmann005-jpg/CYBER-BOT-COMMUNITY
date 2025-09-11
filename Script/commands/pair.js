@@ -19,18 +19,15 @@ module.exports.config = {
 };
 
 module.exports.onLoad = async () => {
-  const { downloadFile } = global.utils || {};
   const dirMaterial = path.join(__dirname, "cache", "canvas");
   const bgPath = path.join(dirMaterial, "pair_bg.jpg");
 
   if (!fs.existsSync(dirMaterial)) fs.mkdirSync(dirMaterial, { recursive: true });
 
-  // default romantic background
-  if (!fs.existsSync(bgPath) && downloadFile) {
-    await downloadFile(
-      "https://miro.medium.com/v2/resize:fit:1200/1*wt0bz2sLraXwvfkkjBq7fg.jpeg",
-      bgPath
-    );
+  if (!fs.existsSync(bgPath)) {
+    const url = "https://miro.medium.com/v2/resize:fit:1200/1*wt0bz2sLraXwvfkkjBq7fg.jpeg"; // romantic heart background
+    const response = await axios.get(url, { responseType: "arraybuffer" });
+    fs.writeFileSync(bgPath, Buffer.from(response.data, "binary"));
   }
 };
 
