@@ -19,7 +19,7 @@ module.exports.onLoad = async () => {
  const { downloadFile } = global.utils;
  const dirMaterial = __dirname + `/cache/canvas/`;
  const path = resolve(__dirname, 'cache/canvas', 'pairing.png');
- if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
+ if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
  if (!existsSync(path)) await downloadFile("https://i.postimg.cc/GhnBSKCS/ai-generated-9306969-1280.jpg", path);
 };
 
@@ -31,6 +31,12 @@ async function makeImage({ one, two }) {
  const __root = path.resolve(__dirname, "cache", "canvas");
 
  let pairing_img = await jimp.read(__root + "/pairing.png");
+ try {
+  pairing_img = await jimp.read(__root + "/pairing.png");
+ } catch (error) {
+  console.error("Error loading pairing.png, trying jpg format", error);
+  pairing_img = await jimp.read(__root + "/pairing.jpg");
+ }
  let pathImg = __root + `/pairing_${one}_${two}.png`;
  let avatarOne = __root + `/avt_${one}.png`;
  let avatarTwo = __root + `/avt_${two}.png`;
