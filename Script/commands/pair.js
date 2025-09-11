@@ -5,94 +5,151 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair",
-  version: "1.0.4",
+  version: "1.0.5",
   hasPermssion: 0,
-  credits: "CYBER TEAM (final fix by GPT)",
+  credits: "CYBER TEAM (fixed by GPT)",
   description: "Pair two users with a romantic heart background",
   commandCategory: "Picture",
   cooldowns: 5,
   dependencies: {
-    "axios": "",
+    axios: "",
     "fs-extra": "",
-    "jimp": ""
+    jimp: ""
   }
 };
 
-// ✅ Ensure romantic heart background exists
+// ensure directory + background
+async function ensureCanvasDir() {
+  const dir = path.join(__dirname, "cache", "canvas");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
 async function ensureBackground() {
-  const dirMaterial = path.join(__dirname, "cache", "canvas");
-  const bgPath = path.join(dirMaterial, "pair_bg.jpg");
-
-  if (!fs.existsSync(dirMaterial)) fs.mkdirSync(dirMaterial, { recursive: true });
-
+  const dir = await ensureCanvasDir();
+  const bgPath = path.join(dir, "pair_bg.jpg");
   if (!fs.existsSync(bgPath)) {
     const url =
       "https://png.pngtree.com/thumb_back/fh260/background/20240204/pngtree-lovely-happy-valentines-day-background-with-realistic-3d-hearts-design-image_15600712.png";
-    const response = await axios.get(url, { responseType: "arraybuffer" });
-    fs.writeFileSync(bgPath, Buffer.from(response.data, "binary"));
+    const res = await axios.get(url, { responseType: "arraybuffer", maxRedirects: 5 });
+    fs.writeFileSync(bgPath, Buffer.from(res.data));
   }
   return bgPath;
 }
 
-// ✅ Circle crop: now accepts a Jimp image directly
-async function circle(img) {
-  const mask = new Jimp(img.bitmap.width, img.bitmap.height, 0x00000000);
-  const radius = img.bitmap.width / 2;
+// fetch avatar buffer + content-type (defensive)
+async function fetchAvatarBuffer(fbId) {
+  try {
+    const url = `https://graph.facebook.com/${fbId}/picture?width=512&height=512`;
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      maxRedirects: 5,
+      // don't throw on redirect/304, we'll treat non-2xx as failure below
+      validateStatus: () => true
+    });
 
-  mask.scan(0, 0, mask.bitmap.width, mask.bitmap.height, function (x, y, idx) {
-    const dx = x - radius;
-    const dy = y - radius;
-    if (dx * dx + dy * dy <= radius * radius) {
-      this.bitmap.data[idx + 3] = 255; // visible pixel
-    }
-  });
+    const contentType = (res.headers && res.headers["content-type"]) ? res.headers["content-type"] : "";
+    const buf = Buffer.from(res.data);
 
-  img.mask(mask, 0, 0);
-  return img;
+    return { ok: contentType.startsWith("image/"), buffer: buf, contentType, status: res.status };
+  } catch (err) {
+    return { ok: false, buffer: null, contentType: null, error: err.message };
+  }
 }
 
-// ✅ Create the paired image
+// predictable circle crop by copying pixels inside radius
+async function circleCropFromJimp(imageJimp, size) {
+  const src = imageJimp.clone().cover(size, size); // cover keeps aspect and fills
+  const out = new Jimp(size, size, 0x00000000); // transparent
+  const radius = size / 2;
+  const cx = radius, cy = radius;
+
+  // iterate pixels and copy inside circle
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - cx + 0.5;
+      const dy = y - cy + 0.5;
+      if (dx * dx + dy * dy <= radius * radius) {
+        const idxSrc = src.getPixelIndex(x, y);
+        const idxOut = out.getPixelIndex(x, y);
+        out.bitmap.data[idxOut + 0] = src.bitmap.data[idxSrc + 0];
+        out.bitmap.data[idxOut + 1] = src.bitmap.data[idxSrc + 1];
+        out.bitmap.data[idxOut + 2] = src.bitmap.data[idxSrc + 2];
+        out.bitmap.data[idxOut + 3] = src.bitmap.data[idxSrc + 3];
+      }
+    }
+  }
+  return out;
+}
+
+// fallback avatar (a simple colored circle)
+async function makeFallbackAvatar(size, colorHex = 0xCCCCCCFF) {
+  // create a solid square, then circle-crop it to have transparent outside
+  const base = new Jimp(size, size, colorHex);
+  // produce circular by using the same circleCropFromJimp method
+  return await circleCropFromJimp(base, size);
+}
+
 async function makeImage({ one, two }) {
-  const __root = path.resolve(__dirname, "cache", "canvas");
+  const dir = await ensureCanvasDir();
   const bgPath = await ensureBackground();
   const pair_bg = await Jimp.read(bgPath);
 
-  // Download avatars directly as buffers
-  const avatarOneBuffer = (
-    await axios.get(`https://graph.facebook.com/${one}/picture?width=512&height=512`, {
-      responseType: "arraybuffer"
-    })
-  ).data;
-
-  const avatarTwoBuffer = (
-    await axios.get(`https://graph.facebook.com/${two}/picture?width=512&height=512`, {
-      responseType: "arraybuffer"
-    })
-  ).data;
-
-  // Load into Jimp and apply circle crop
-  const circleOne = await circle(await Jimp.read(avatarOneBuffer));
-  const circleTwo = await circle(await Jimp.read(avatarTwoBuffer));
-
-  // Optional: save debug avatars if needed
-  // await circleOne.writeAsync(path.join(__root, "debug_one.png"));
-  // await circleTwo.writeAsync(path.join(__root, "debug_two.png"));
-
-  // Composite avatars onto background (larger and slightly adjusted)
+  // pick an avatar display size relative to background
   const { width, height } = pair_bg.bitmap;
-  pair_bg
-    .composite(circleOne.resize(250, 250), width * 0.18, height * 0.28)
-    .composite(circleTwo.resize(250, 250), width * 0.62, height * 0.28);
+  const avatarSize = Math.max(120, Math.floor(Math.min(width, height) * 0.22)); // e.g., ~22% of smaller dimension
 
-  // Save final image
-  const pathImg = path.join(__root, `pair_${one}_${two}.png`);
-  const raw = await pair_bg.getBufferAsync("image/png");
-  fs.writeFileSync(pathImg, raw);
+  // helper to get prepared circular avatar for an id (with debug files)
+  async function prepareAvatar(id, debugName) {
+    const fetched = await fetchAvatarBuffer(id);
+    if (!fetched.ok || !fetched.buffer) {
+      // save non-image content so you can inspect it
+      if (fetched.buffer) {
+        try {
+          fs.writeFileSync(path.join(dir, `debug_nonimage_${debugName}.bin`), fetched.buffer);
+        } catch (e) { /* ignore write errors */ }
+      }
+      // fallback
+      const fallback = await makeFallbackAvatar(avatarSize);
+      await fallback.writeAsync(path.join(dir, `debug_fallback_${debugName}.png`));
+      return fallback;
+    }
 
-  return pathImg;
+    // attempt to load with Jimp
+    try {
+      const jimg = await Jimp.read(fetched.buffer);
+      const circ = await circleCropFromJimp(jimg, avatarSize);
+      // write debug avatars so you can inspect whether download succeeded
+      await circ.writeAsync(path.join(dir, `debug_avt_${debugName}.png`));
+      return circ;
+    } catch (err) {
+      // on any read error -> fallback and save raw buffer for debugging
+      try {
+        fs.writeFileSync(path.join(dir, `debug_badimg_${debugName}.bin`), fetched.buffer);
+      } catch (e) {}
+      const fallback = await makeFallbackAvatar(avatarSize);
+      await fallback.writeAsync(path.join(dir, `debug_fallback_${debugName}.png`));
+      return fallback;
+    }
+  }
+
+  const circleOne = await prepareAvatar(one, "one");
+  const circleTwo = await prepareAvatar(two, "two");
+
+  // compute positions (ensure they are inside canvas)
+  const x1 = Math.max(0, Math.floor(width * 0.16));
+  const x2 = Math.max(0, Math.floor(width * 0.62));
+  const y = Math.max(0, Math.floor(height * 0.28));
+
+  pair_bg.composite(circleOne, x1, y);
+  pair_bg.composite(circleTwo, x2, y);
+
+  // save result
+  const outPath = path.join(dir, `pair_${one}_${two}.png`);
+  await pair_bg.writeAsync(outPath);
+
+  return outPath;
 }
 
-// ✅ Bot command entry
 module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, senderID } = event;
 
@@ -101,14 +158,14 @@ module.exports.run = async function ({ api, event }) {
 
   try {
     const senderInfo = await api.getUserInfo(senderID);
-    const senderName = senderInfo[senderID].name;
+    const senderName = senderInfo && senderInfo[senderID] ? senderInfo[senderID].name : "You";
 
     const threadInfo = await api.getThreadInfo(threadID);
-    const participants = threadInfo.participantIDs.filter((id) => id !== senderID);
-    const partnerID = participants[Math.floor(Math.random() * participants.length)];
+    const participants = (threadInfo && threadInfo.participantIDs) ? threadInfo.participantIDs.filter(id => id !== senderID) : [];
+    const partnerID = participants.length ? participants[Math.floor(Math.random() * participants.length)] : senderID;
 
     const partnerInfo = await api.getUserInfo(partnerID);
-    const partnerName = partnerInfo[partnerID].name;
+    const partnerName = partnerInfo && partnerInfo[partnerID] ? partnerInfo[partnerID].name : "Partner";
 
     const mentions = [
       { id: senderID, tag: senderName },
@@ -117,17 +174,14 @@ module.exports.run = async function ({ api, event }) {
 
     const pathImg = await makeImage({ one: senderID, two: partnerID });
 
-    api.sendMessage(
-      {
-        body: `🥰 Successful pairing\n• ${senderName} 🎀\n• ${partnerName} 🎀\n💌 Wishing you 200 years of happiness 💕\n\nLove percentage: ${matchRate} 💙`,
-        mentions,
-        attachment: fs.createReadStream(pathImg)
-      },
-      threadID,
-      () => fs.unlinkSync(pathImg),
-      messageID
-    );
+    api.sendMessage({
+      body: `🥰 Successful pairing\n• ${senderName} 🎀\n• ${partnerName} 🎀\n💌 Wishing you 200 years of happiness 💕\n\nLove percentage: ${matchRate} 💙`,
+      mentions,
+      attachment: fs.createReadStream(pathImg)
+    }, threadID, () => {
+      try { fs.unlinkSync(pathImg); } catch (e) {}
+    }, messageID);
   } catch (err) {
-    api.sendMessage(`⚠️ Error generating pair image: ${err.message}`, threadID, messageID);
+    api.sendMessage(`⚠️ Error generating pair image: ${err && err.message ? err.message : String(err)}`, threadID, messageID);
   }
 };
