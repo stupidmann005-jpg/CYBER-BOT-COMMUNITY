@@ -1,5 +1,5 @@
 module.exports.config = {
- name: "ullash",
+ name: "ZISAN",
  version: "1.0.0",
  hasPermssion: 0,
  credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
@@ -17,14 +17,14 @@ module.exports.config = {
 module.exports.handleEvent = async ({ api, event, Threads,Users}) => {
 var id = event.senderID;
  var name = await Users.getNameUser(event.senderID);
- if (event.body.indexOf("ULLASH")==0 || (event.body.indexOf("ullash bau")==0) || event.body.indexOf("উল্লাস ভাই")==0 ||
-event.body.indexOf("Ullash bai")==0 ||
-event.body.indexOf("ullash dadu")==0 ||
-event.body.indexOf("উল্লাস")==0 ||
-event.body.indexOf("ullash")==0 ||
-event.body.indexOf("ulash")==0 ||
-event.body.indexOf("ullas")==0 ||
-event.body.indexOf("ullah")==0) {
+ if (event.body.indexOf("ZISAN")==0 || (event.body.indexOf("ZISAN bau")==0) || event.body.indexOf("জিসান ভাই")==0 ||
+event.body.indexOf("ZISAN bai")==0 ||
+event.body.indexOf("ZISAN dadu")==0 ||
+event.body.indexOf("জিসান")==0 ||
+event.body.indexOf("ZISAN")==0 ||
+event.body.indexOf("zisan")==0 ||
+event.body.indexOf("zishan")==0 ||
+event.body.indexOf("jisan")==0) {
  const axios = global.nodemodule["axios"];
 const request = global.nodemodule["request"];
 const fs = global.nodemodule["fs-extra"];
@@ -67,6 +67,13 @@ api.sendMessage(`${(data["salam"] == false) ? getText("off") : getText("on")} ${
 } 
 
 
+
+
+
+ }
+module.exports.run = async({api,event,args,Users,Threads,Currencies}) => {
+
+ };
 
 
 
