@@ -20,7 +20,7 @@ module.exports.onLoad = async () => {
  const dirMaterial = __dirname + `/cache/canvas/`;
  const path = resolve(__dirname, 'cache/canvas', 'pair5_bg.jpg');
  if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
- if (!existsSync(path)) await downloadFile("https://i.imgur.com/dbI3Yle.jpg", path);
+ if (!existsSync(path)) await downloadFile("https://static.vecteezy.com/system/resources/thumbnails/036/031/489/small_2x/ai-generated-a-couple-of-love-standing-in-a-colorful-night-background-generative-ai-photo.jpg", path);
 };
 
 async function makeImage({ one, two }) {
@@ -86,6 +86,7 @@ async function isVIP(api, userID) {
 
 module.exports.run = async function ({ api, event, args }) {
  const { threadID, messageID, senderID } = event;
+ const fs = global.nodemodule["fs-extra"];
 
  // Check if user is VIP
  const isUserVIP = await isVIP(api, senderID);
