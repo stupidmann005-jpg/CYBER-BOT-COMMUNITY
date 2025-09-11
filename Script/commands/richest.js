@@ -12,6 +12,18 @@ module.exports.config = {
     cooldowns: 5
 };
 
+// Initialize bank data on bot load
+module.exports.onLoad = function() {
+    const fs = require('fs-extra');
+    const path = require('path');
+    
+    // Ensure cache directory exists
+    const cachePath = path.join(__dirname, 'cache');
+    if (!fs.existsSync(cachePath)) {
+        fs.mkdirSync(cachePath, { recursive: true });
+    }
+}
+
 // Bank data storage path
 const bankDataPath = path.join(__dirname, 'cache', 'bankData.json');
 
