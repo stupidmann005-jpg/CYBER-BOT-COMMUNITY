@@ -26,7 +26,7 @@ async function ensureBackground() {
 
   if (!fs.existsSync(bgPath)) {
     // romantic background
-    const url = "https://png.pngtree.com/thumb_back/fh260/background/20240204/pngtree-lovely-happy-valentines-day-background-with-realistic-3d-hearts-design-image_15600712.png";
+    const url = "https://www.hdwallpapers.in/thumbs/2021/purple_glittering_heart_in_black_background_hd_love-t2.jpg";
     const response = await axios.get(url, { responseType: "arraybuffer" });
     fs.writeFileSync(bgPath, Buffer.from(response.data, "binary"));
   }
