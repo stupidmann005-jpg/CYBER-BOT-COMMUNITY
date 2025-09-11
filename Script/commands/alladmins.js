@@ -18,7 +18,6 @@ module.exports.run = async function({ api, event }) {
         const configPath = path.resolve(__dirname, '../../config.json');
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         const adminIds = config.ADMINBOT || [];
-        const ndhIds = config.NDH || [];
         
         if (adminIds.length === 0) {
             return api.sendMessage("❌ No admins found in the configuration.", event.threadID, event.messageID);
@@ -34,32 +33,38 @@ module.exports.run = async function({ api, event }) {
         const participantIds = threadInfo.participantIDs || [];
         
         // Try to get admin names using Facebook API
-        let adminInfo;
+        let adminInfo = {};
         try {
             adminInfo = await api.getUserInfo(adminIds);
         } catch (err) {
             // If we can't get user info, we'll just show IDs
-            adminInfo = {};
         }
         
-        // Prepare admin list message
-        let message = "👑 𝗕𝗢𝗧 𝗔𝗗𝗠𝗜𝗡𝗦 👑\n\n";
+        // Prepare admin list message with a more beautiful design
+        let message = "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n";
+        message += "┃     ⭐👑 𝐁𝐎𝐓 𝐀𝐃𝐌𝐈𝐍𝐈𝐒𝐓𝐑𝐀𝐓𝐎𝐑𝐒 👑⭐     \n";
+        message += "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n";
         
-        for (const adminId of adminIds) {
+        for (let i = 0; i < adminIds.length; i++) {
+            const adminId = adminIds[i];
             const isInThread = participantIds.includes(adminId);
             const statusEmoji = isInThread ? "🟢" : "🔴";
-            const isNDH = ndhIds.includes(adminId);
-            const ndhBadge = isNDH ? "👑 " : "";
             
             const name = adminInfo[adminId] ? adminInfo[adminId].name : adminId;
-            message += `${statusEmoji} ${ndhBadge}${name} (${adminId})\n`;
+            message += `┃ ${i+1}. ${statusEmoji} ${name}\n`;
+            message += `┃    └─ 𝐈𝐃: ${adminId}\n`;
+            if (i < adminIds.length - 1) {
+                message += "┃\n";
+            }
         }
         
-        // Add legend
-        message += "\n𝗟𝗘𝗚𝗘𝗡𝗗:\n";
-        message += "🟢 = Active in this thread\n";
-        message += "🔴 = Not in this thread\n";
-        message += "👑 = Super Admin\n";
+        // Add legend and total count
+        message += "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n";
+        message += `┃ 📊 𝐓𝐨𝐭𝐚𝐥 𝐀𝐝𝐦𝐢𝐧𝐬: ${adminIds.length}\n`;
+        message += "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n";
+        message += "┃ 🟢 = 𝐀𝐜𝐭𝐢𝐯𝐞 𝐢𝐧 𝐭𝐡𝐢𝐬 𝐭𝐡𝐫𝐞𝐚𝐝\n";
+        message += "┃ 🔴 = 𝐍𝐨𝐭 𝐢𝐧 𝐭𝐡𝐢𝐬 𝐭𝐡𝐫𝐞𝐚𝐝\n";
+        message += "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛";
         
         return api.sendMessage(message, event.threadID, event.messageID);
     } catch (error) {
