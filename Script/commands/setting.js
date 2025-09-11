@@ -90,9 +90,27 @@ module.exports.handleReply = async function({
              return api.sendMessage("Border convex rights?", event.threadID, event.messageID);
            const listAdmin = global.config.ADMINBOT[0];
     if (senderID != listAdmin) return api.sendMessage("done -_-", threadID, messageID);
+          
+          // Check if config is locked
+          const { existsSync, readFileSync } = require('fs-extra');
+          const lockPath = global.client.configPath.replace("config.json", "config.lock");
+          
+          // If lock exists and the override function is available, use it
+          if (existsSync(lockPath) && global.configLocked) {
+              try {
+                  const lockedConfig = JSON.parse(readFileSync(lockPath, 'utf8'));
+                  global.config = lockedConfig;
+                  return api.sendMessage("Reloaded config from locked version. Use '/lockconfig off' to disable config locking.", event.threadID, event.messageID);
+              } catch (error) {
+                  // If there's an error reading the lock, proceed with normal reload
+                  console.error("Error loading locked config:", error);
+              }
+          }
+          
+          // Normal reload process
           delete require.cache[require.resolve(global.client.configPath)];
-global.config = require(global.client.configPath);
-return api.sendMessage("Successfully reloaded config.json", event.threadID, event.messageID);    
+          global.config = require(global.client.configPath);
+          return api.sendMessage("Successfully reloaded config.json", event.threadID, event.messageID);    
 }break;
         case "3": {
           const permission = ["100015168369582"];
