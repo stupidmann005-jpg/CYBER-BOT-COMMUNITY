@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair",
-  version: "1.0.1",
+  version: "1.0.2",
   hasPermssion: 0,
   credits: "CYBER TEAM (fixed by GPT)",
   description: "Pair two users with a romantic heart background",
@@ -18,23 +18,27 @@ module.exports.config = {
   }
 };
 
-module.exports.onLoad = async () => {
+async function ensureBackground() {
   const dirMaterial = path.join(__dirname, "cache", "canvas");
   const bgPath = path.join(dirMaterial, "pair_bg.jpg");
 
   if (!fs.existsSync(dirMaterial)) fs.mkdirSync(dirMaterial, { recursive: true });
 
   if (!fs.existsSync(bgPath)) {
-    const url = "https://miro.medium.com/v2/resize:fit:1200/1*wt0bz2sLraXwvfkkjBq7fg.jpeg"; // romantic heart background
+    const url = "https://i.ibb.co/9g5n6xk/love-bg.jpg"; // permanent love background
     const response = await axios.get(url, { responseType: "arraybuffer" });
     fs.writeFileSync(bgPath, Buffer.from(response.data, "binary"));
   }
-};
+
+  return bgPath;
+}
 
 async function makeImage({ one, two }) {
   const __root = path.resolve(__dirname, "cache", "canvas");
 
-  let pair_bg = await Jimp.read(path.join(__root, "pair_bg.jpg"));
+  const bgPath = await ensureBackground(); // ✅ make sure background exists
+
+  let pair_bg = await Jimp.read(bgPath);
   let pathImg = path.join(__root, `pair_${one}_${two}.png`);
   let avatarOne = path.join(__root, `avt_${one}.png`);
   let avatarTwo = path.join(__root, `avt_${two}.png`);
@@ -85,7 +89,7 @@ async function circle(imagePath) {
     const dx = x - radius;
     const dy = y - radius;
     if (dx * dx + dy * dy <= radius * radius) {
-      this.bitmap.data[idx + 3] = 255; // fully visible
+      this.bitmap.data[idx + 3] = 255; // visible pixel
     }
   });
 
@@ -93,7 +97,7 @@ async function circle(imagePath) {
   return img;
 }
 
-module.exports.run = async function ({ api, event, args }) {
+module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, senderID } = event;
 
   // Match percentage
