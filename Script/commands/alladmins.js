@@ -50,7 +50,7 @@ module.exports.run = async function({ api, event }) {
             const isInThread = participantIds.includes(adminId);
             const statusEmoji = isInThread ? "🟢" : "🔴";
             
-            const name = adminInfo[adminId] ? adminInfo[adminId].name : adminId;
+            const name = adminInfo[adminId] ? adminInfo[adminId].name : "Unknown";
             message += `┃ ${i+1}. ${statusEmoji} ${name}\n`;
             message += `┃    └─ 𝐈𝐃: ${adminId}\n`;
             if (i < adminIds.length - 1) {
