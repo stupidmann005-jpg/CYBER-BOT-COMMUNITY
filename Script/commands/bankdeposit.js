@@ -13,6 +13,30 @@ module.exports.config = {
     aliases: ["deposit"]
 };
 
+// Initialize bank data on bot load
+module.exports.onLoad = function() {
+    const fs = require('fs-extra');
+    const path = require('path');
+    
+    // Ensure cache directory exists
+    const cachePath = path.join(__dirname, 'cache');
+    if (!fs.existsSync(cachePath)) {
+        fs.mkdirSync(cachePath, { recursive: true });
+    }
+    
+    // Initialize bank data file if it doesn't exist
+    const bankDataPath = path.join(cachePath, 'bankData.json');
+    if (!fs.existsSync(bankDataPath)) {
+        fs.writeFileSync(bankDataPath, JSON.stringify({
+            users: {},
+            interestRate: 0.001, // 0.1% daily interest
+            loanInterestRate: 0.005, // 0.5% daily interest on loans
+            maxLoanAmount: 50000,
+            lastInterestUpdate: Date.now()
+        }, null, 4));
+    }
+}
+
 // Bank data storage path
 const bankDataPath = path.join(__dirname, 'cache', 'bankData.json');
 
