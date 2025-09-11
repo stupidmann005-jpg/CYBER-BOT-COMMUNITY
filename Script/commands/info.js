@@ -1,3 +1,6 @@
+const axios = global.nodemodule["axios"];
+const fs = global.nodemodule["fs-extra"];
+
 module.exports.config = {
  name: "info",
  version: "1.2.7",
@@ -18,8 +21,6 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
  const { NDH } = global.config;
  const { userName } = global.data;
  const request = global.nodemodule["request"];
- const fs = global.nodemodule["fs-extra"];
- const axios = global.nodemodule["axios"];
  const { writeFileSync } = global.nodemodule["fs-extra"];
  const mention = Object.keys(mentions);
  delete require.cache[require.resolve(configPath)];
