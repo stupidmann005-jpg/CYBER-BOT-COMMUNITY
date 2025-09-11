@@ -69,6 +69,14 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
 				return api.sendMessage(`[Error] No backup file found at ${backupPath}`, threadID, messageID);
 			}
 			
+			// Check if config is locked
+			const lockPath = configPath.replace("config.json", "config.lock");
+			const isLocked = existsSync(lockPath);
+			
+			if (isLocked && global.configLocked) {
+				return api.sendMessage(`[Error] Configuration is currently locked. Use '/lockconfig off' to disable locking before restoring.`, threadID, messageID);
+			}
+			
 			// Load backup data
 			const backupData = JSON.parse(readFileSync(backupPath, 'utf8'));
 			
