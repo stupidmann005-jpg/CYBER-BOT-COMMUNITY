@@ -5,9 +5,9 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair",
-  version: "1.0.3",
+  version: "1.0.4",
   hasPermssion: 0,
-  credits: "CYBER TEAM (fixed by GPT)",
+  credits: "CYBER TEAM (final fix by GPT)",
   description: "Pair two users with a romantic heart background",
   commandCategory: "Picture",
   cooldowns: 5,
@@ -18,7 +18,7 @@ module.exports.config = {
   }
 };
 
-// ✅ Ensure romantic heart background exists locally
+// ✅ Ensure romantic heart background exists
 async function ensureBackground() {
   const dirMaterial = path.join(__dirname, "cache", "canvas");
   const bgPath = path.join(dirMaterial, "pair_bg.jpg");
@@ -34,9 +34,8 @@ async function ensureBackground() {
   return bgPath;
 }
 
-// ✅ Crop image into a circle mask
-async function circle(imagePath) {
-  const img = await Jimp.read(imagePath);
+// ✅ Circle crop: now accepts a Jimp image directly
+async function circle(img) {
   const mask = new Jimp(img.bitmap.width, img.bitmap.height, 0x00000000);
   const radius = img.bitmap.width / 2;
 
@@ -44,7 +43,7 @@ async function circle(imagePath) {
     const dx = x - radius;
     const dy = y - radius;
     if (dx * dx + dy * dy <= radius * radius) {
-      this.bitmap.data[idx + 3] = 255; // fully visible pixel
+      this.bitmap.data[idx + 3] = 255; // visible pixel
     }
   });
 
@@ -58,41 +57,37 @@ async function makeImage({ one, two }) {
   const bgPath = await ensureBackground();
   const pair_bg = await Jimp.read(bgPath);
 
-  const avatarOne = path.join(__root, `avt_${one}.png`);
-  const avatarTwo = path.join(__root, `avt_${two}.png`);
-  const pathImg = path.join(__root, `pair_${one}_${two}.png`);
-
-  // Download and save avatars with correct encoding
-  const getAvatarOne = (
+  // Download avatars directly as buffers
+  const avatarOneBuffer = (
     await axios.get(`https://graph.facebook.com/${one}/picture?width=512&height=512`, {
       responseType: "arraybuffer"
     })
   ).data;
-  fs.writeFileSync(avatarOne, Buffer.from(getAvatarOne, "binary"));
 
-  const getAvatarTwo = (
+  const avatarTwoBuffer = (
     await axios.get(`https://graph.facebook.com/${two}/picture?width=512&height=512`, {
       responseType: "arraybuffer"
     })
   ).data;
-  fs.writeFileSync(avatarTwo, Buffer.from(getAvatarTwo, "binary"));
 
-  // Circle crop
-  const circleOne = await circle(avatarOne);
-  const circleTwo = await circle(avatarTwo);
+  // Load into Jimp and apply circle crop
+  const circleOne = await circle(await Jimp.read(avatarOneBuffer));
+  const circleTwo = await circle(await Jimp.read(avatarTwoBuffer));
 
-  // Composite on background
+  // Optional: save debug avatars if needed
+  // await circleOne.writeAsync(path.join(__root, "debug_one.png"));
+  // await circleTwo.writeAsync(path.join(__root, "debug_two.png"));
+
+  // Composite avatars onto background (larger and slightly adjusted)
   const { width, height } = pair_bg.bitmap;
   pair_bg
-    .composite(circleOne.resize(200, 200), width * 0.2, height * 0.3)
-    .composite(circleTwo.resize(200, 200), width * 0.6, height * 0.3);
+    .composite(circleOne.resize(250, 250), width * 0.18, height * 0.28)
+    .composite(circleTwo.resize(250, 250), width * 0.62, height * 0.28);
 
+  // Save final image
+  const pathImg = path.join(__root, `pair_${one}_${two}.png`);
   const raw = await pair_bg.getBufferAsync("image/png");
   fs.writeFileSync(pathImg, raw);
-
-  // Clean temp avatars
-  fs.unlinkSync(avatarOne);
-  fs.unlinkSync(avatarTwo);
 
   return pathImg;
 }
@@ -101,7 +96,6 @@ async function makeImage({ one, two }) {
 module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, senderID } = event;
 
-  // Match percentage
   const percentages = ["21%", "67%", "19%", "37%", "17%", "96%", "52%", "62%", "76%", "83%", "100%", "99%", "0%", "48%"];
   const matchRate = percentages[Math.floor(Math.random() * percentages.length)];
 
