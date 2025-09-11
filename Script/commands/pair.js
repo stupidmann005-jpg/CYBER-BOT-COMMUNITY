@@ -1,9 +1,9 @@
 module.exports.config = {
  name: "pair",
- version: "1.0.2",
+ version: "1.0.0",
  hasPermssion: 0,
  credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
- description: "Pair two users with a fun compatibility score",
+ description: "Pair two users with a romantic heart background",
  commandCategory: "Picture",
  cooldowns: 5,
  dependencies: {
@@ -18,8 +18,8 @@ module.exports.onLoad = async () => {
  const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
  const { downloadFile } = global.utils;
  const dirMaterial = __dirname + `/cache/canvas/`;
- const path = resolve(__dirname, 'cache/canvas', 'pairing.png');
- if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
+ const path = resolve(__dirname, 'cache/canvas', 'pair_bg.jpg');
+ if (!existsSync(dirMaterial + "canvas")) mkdirSync(dirMaterial, { recursive: true });
  if (!existsSync(path)) await downloadFile("https://miro.medium.com/v2/resize:fit:1200/1*wt0bz2sLraXwvfkkjBq7fg.jpeg", path);
 };
 
@@ -30,14 +30,8 @@ async function makeImage({ one, two }) {
  const jimp = global.nodemodule["jimp"];
  const __root = path.resolve(__dirname, "cache", "canvas");
 
- let pairing_img = await jimp.read(__root + "/pairing.png");
- try {
-  pairing_img = await jimp.read(__root + "/pairing.png");
- } catch (error) {
-  console.error("Error loading pairing.png, trying jpg format", error);
-  pairing_img = await jimp.read(__root + "/pairing.jpg");
- }
- let pathImg = __root + `/pairing_${one}_${two}.png`;
+ let pair_bg = await jimp.read(__root + "/pair_bg.jpg");
+ let pathImg = __root + `/pair_${one}_${two}.png`;
  let avatarOne = __root + `/avt_${one}.png`;
  let avatarTwo = __root + `/avt_${two}.png`;
 
@@ -49,9 +43,11 @@ async function makeImage({ one, two }) {
 
  let circleOne = await jimp.read(await circle(avatarOne));
  let circleTwo = await jimp.read(await circle(avatarTwo));
- pairing_img.composite(circleOne.resize(150, 150), 980, 200).composite(circleTwo.resize(150, 150), 140, 200);
+ 
+ // Position the avatars on either side of the heart
+ pair_bg.composite(circleOne.resize(150, 150), 100, 150).composite(circleTwo.resize(150, 150), 550, 150);
 
- let raw = await pairing_img.getBufferAsync("image/png");
+ let raw = await pair_bg.getBufferAsync("image/png");
 
  fs.writeFileSync(pathImg, raw);
  fs.unlinkSync(avatarOne);
@@ -67,10 +63,9 @@ async function circle(image) {
  return await image.getBufferAsync("image/png");
 }
 
-module.exports.run = async function ({ api, event }) {
- const axios = require("axios");
- const fs = require("fs-extra");
+module.exports.run = async function ({ api, event, args }) {
  const { threadID, messageID, senderID } = event;
+ const fs = global.nodemodule["fs-extra"];
 
  // Match percentage
  const percentages = ['21%', '67%', '19%', '37%', '17%', '96%', '52%', '62%', '76%', '83%', '100%', '99%', '0%', '48%'];
@@ -89,17 +84,17 @@ module.exports.run = async function ({ api, event }) {
 
  // Mentions
  let mentions = [
- { id: senderID, tag: senderName },
- { id: partnerID, tag: partnerName }
+   { id: senderID, tag: senderName },
+   { id: partnerID, tag: partnerName }
  ];
 
  // Generate and send image
  let one = senderID, two = partnerID;
  return makeImage({ one, two }).then(path => {
- api.sendMessage({
- body: `🥰𝐒𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥 𝐩𝐚𝐢𝐫𝐢𝐧𝐠\n• ${senderName}🎀\n• ${partnerName}🎀\n💌𝐖𝐢𝐬𝐡 𝐲𝐨𝐮 𝐭𝐰𝐨 𝐡𝐮𝐧𝐝𝐫𝐞𝐝 𝐲𝐞𝐚𝐫𝐬 𝐨𝐟 𝐡𝐚𝐩𝐩𝐢𝐧𝐞𝐬𝐬💕\n \n 𝐋𝐨𝐯𝐞 𝐩𝐞𝐫𝐜𝐞𝐧𝐭𝐚𝐠𝐞 ${matchRate}💙`,
- mentions,
- attachment: fs.createReadStream(path)
- }, threadID, () => fs.unlinkSync(path), messageID);
+   api.sendMessage({
+     body: `🥰𝐒𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥 𝐩𝐚𝐢𝐫𝐢𝐧𝐠\n• ${senderName}🎀\n• ${partnerName}🎀\n💌𝐖𝐢𝐬𝐡 𝐲𝐨𝐮 𝐭𝐰𝐨 𝐡𝐮𝐧𝐝𝐫𝐞𝐝 𝐲𝐞𝐚𝐫𝐬 𝐨𝐟 𝐡𝐚𝐩𝐩𝐢𝐧𝐞𝐬𝐬💕\n \n 𝐋𝐨𝐯𝐞 𝐩𝐞𝐫𝐜𝐞𝐧𝐭𝐚𝐠𝐞 ${matchRate}💙`,
+     mentions,
+     attachment: fs.createReadStream(path)
+   }, threadID, () => fs.unlinkSync(path), messageID);
  });
 };
