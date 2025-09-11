@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair",
-  version: "1.0.5",
+  version: "1.0.6",
   hasPermssion: 0,
   credits: "CYBER TEAM (fixed by GPT)",
   description: "Pair two users with a romantic heart background",
@@ -17,6 +17,9 @@ module.exports.config = {
     jimp: ""
   }
 };
+
+// Facebook app token (use your own if possible)
+const FB_APP_TOKEN = "6628568379|c1e620fa708a1d5696fb991c1bde5662";
 
 // ensure directory + background
 async function ensureCanvasDir() {
@@ -36,57 +39,19 @@ async function ensureBackground() {
   return bgPath;
 }
 
-// fetch avatar buffer + content-type (defensive)
-async function fetchAvatarBuffer(fbId) {
-  try {
-    const url = `https://graph.facebook.com/${fbId}/picture?width=512&height=512`;
-    const res = await axios.get(url, {
-      responseType: "arraybuffer",
-      maxRedirects: 5,
-      // don't throw on redirect/304, we'll treat non-2xx as failure below
-      validateStatus: () => true
-    });
-
-    const contentType = (res.headers && res.headers["content-type"]) ? res.headers["content-type"] : "";
-    const buf = Buffer.from(res.data);
-
-    return { ok: contentType.startsWith("image/"), buffer: buf, contentType, status: res.status };
-  } catch (err) {
-    return { ok: false, buffer: null, contentType: null, error: err.message };
-  }
+// fetch avatar with token
+async function fetchAvatar(fbId, outPath) {
+  const url = `https://graph.facebook.com/${fbId}/picture?width=512&height=512&access_token=${FB_APP_TOKEN}`;
+  const res = await axios.get(url, { responseType: "arraybuffer", maxRedirects: 5 });
+  fs.writeFileSync(outPath, Buffer.from(res.data));
+  return outPath;
 }
 
-// predictable circle crop by copying pixels inside radius
-async function circleCropFromJimp(imageJimp, size) {
-  const src = imageJimp.clone().cover(size, size); // cover keeps aspect and fills
-  const out = new Jimp(size, size, 0x00000000); // transparent
-  const radius = size / 2;
-  const cx = radius, cy = radius;
-
-  // iterate pixels and copy inside circle
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - cx + 0.5;
-      const dy = y - cy + 0.5;
-      if (dx * dx + dy * dy <= radius * radius) {
-        const idxSrc = src.getPixelIndex(x, y);
-        const idxOut = out.getPixelIndex(x, y);
-        out.bitmap.data[idxOut + 0] = src.bitmap.data[idxSrc + 0];
-        out.bitmap.data[idxOut + 1] = src.bitmap.data[idxSrc + 1];
-        out.bitmap.data[idxOut + 2] = src.bitmap.data[idxSrc + 2];
-        out.bitmap.data[idxOut + 3] = src.bitmap.data[idxSrc + 3];
-      }
-    }
-  }
-  return out;
-}
-
-// fallback avatar (a simple colored circle)
-async function makeFallbackAvatar(size, colorHex = 0xCCCCCCFF) {
-  // create a solid square, then circle-crop it to have transparent outside
-  const base = new Jimp(size, size, colorHex);
-  // produce circular by using the same circleCropFromJimp method
-  return await circleCropFromJimp(base, size);
+// circle crop
+async function circle(image) {
+  const img = await Jimp.read(image);
+  img.circle();
+  return img;
 }
 
 async function makeImage({ one, two }) {
@@ -94,58 +59,27 @@ async function makeImage({ one, two }) {
   const bgPath = await ensureBackground();
   const pair_bg = await Jimp.read(bgPath);
 
-  // pick an avatar display size relative to background
-  const { width, height } = pair_bg.bitmap;
-  const avatarSize = Math.max(120, Math.floor(Math.min(width, height) * 0.22)); // e.g., ~22% of smaller dimension
-
-  // helper to get prepared circular avatar for an id (with debug files)
-  async function prepareAvatar(id, debugName) {
-    const fetched = await fetchAvatarBuffer(id);
-    if (!fetched.ok || !fetched.buffer) {
-      // save non-image content so you can inspect it
-      if (fetched.buffer) {
-        try {
-          fs.writeFileSync(path.join(dir, `debug_nonimage_${debugName}.bin`), fetched.buffer);
-        } catch (e) { /* ignore write errors */ }
-      }
-      // fallback
-      const fallback = await makeFallbackAvatar(avatarSize);
-      await fallback.writeAsync(path.join(dir, `debug_fallback_${debugName}.png`));
-      return fallback;
-    }
-
-    // attempt to load with Jimp
-    try {
-      const jimg = await Jimp.read(fetched.buffer);
-      const circ = await circleCropFromJimp(jimg, avatarSize);
-      // write debug avatars so you can inspect whether download succeeded
-      await circ.writeAsync(path.join(dir, `debug_avt_${debugName}.png`));
-      return circ;
-    } catch (err) {
-      // on any read error -> fallback and save raw buffer for debugging
-      try {
-        fs.writeFileSync(path.join(dir, `debug_badimg_${debugName}.bin`), fetched.buffer);
-      } catch (e) {}
-      const fallback = await makeFallbackAvatar(avatarSize);
-      await fallback.writeAsync(path.join(dir, `debug_fallback_${debugName}.png`));
-      return fallback;
-    }
-  }
-
-  const circleOne = await prepareAvatar(one, "one");
-  const circleTwo = await prepareAvatar(two, "two");
-
-  // compute positions (ensure they are inside canvas)
-  const x1 = Math.max(0, Math.floor(width * 0.16));
-  const x2 = Math.max(0, Math.floor(width * 0.62));
-  const y = Math.max(0, Math.floor(height * 0.28));
-
-  pair_bg.composite(circleOne, x1, y);
-  pair_bg.composite(circleTwo, x2, y);
-
-  // save result
+  const avatarOne = path.join(dir, `avt_${one}.png`);
+  const avatarTwo = path.join(dir, `avt_${two}.png`);
   const outPath = path.join(dir, `pair_${one}_${two}.png`);
+
+  // download avatars with token
+  await fetchAvatar(one, avatarOne);
+  await fetchAvatar(two, avatarTwo);
+
+  // make circular
+  const circleOne = await circle(avatarOne);
+  const circleTwo = await circle(avatarTwo);
+
+  // composite
+  pair_bg
+    .composite(circleOne.resize(150, 150), 100, 150)
+    .composite(circleTwo.resize(150, 150), 550, 150);
+
   await pair_bg.writeAsync(outPath);
+
+  fs.unlinkSync(avatarOne);
+  fs.unlinkSync(avatarTwo);
 
   return outPath;
 }
