@@ -29,8 +29,13 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
 	const { configPath } = global.client;
 	const { ADMINBOT } = global.config;
 	const { userName } = global.data;
-	const { writeFileSync } = global.nodemodule["fs-extra"];
+	const { writeFileSync, existsSync } = global.nodemodule["fs-extra"];
 	const mention = Object.keys(mentions);
+	
+	// Check if config file exists
+	if (!existsSync(configPath)) {
+		return api.sendMessage(`[Error] Config file not found at ${configPath}`, threadID, messageID);
+	}
 	
 	delete require.cache[require.resolve(configPath)];
 	var config = require(configPath);
@@ -49,8 +54,14 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
 		config.ADMINBOT.push(uid);
 		
 		const name = await Users.getNameUser(uid);
-		writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
-		return api.sendMessage(getText("addedNewAdmin", 1, `${name} (https://facebook.com/${uid})`), threadID, messageID);
+		try {
+			writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
+			// Update global config to ensure changes persist in memory
+			global.config.ADMINBOT = config.ADMINBOT;
+			return api.sendMessage(getText("addedNewAdmin", 1, `${name} (https://facebook.com/${uid})`), threadID, messageID);
+		} catch (error) {
+			return api.sendMessage(`[Error] Failed to save admin changes: ${error.message}\nPlease check file permissions for ${configPath}`, threadID, messageID);
+		}
 	}
 	
 	// Handle mentions to add users as admins
@@ -67,8 +78,14 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
 			listAdd.push(`${event.mentions[id]} (https://facebook.com/${id})`);
 		}
 		
-		writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
-		return api.sendMessage(getText("addedNewAdmin", mention.length, listAdd.join("\n")), threadID, messageID);
+		try {
+			writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
+			// Update global config to ensure changes persist in memory
+			global.config.ADMINBOT = config.ADMINBOT;
+			return api.sendMessage(getText("addedNewAdmin", mention.length, listAdd.join("\n")), threadID, messageID);
+		} catch (error) {
+			return api.sendMessage(`[Error] Failed to save admin changes: ${error.message}\nPlease check file permissions for ${configPath}`, threadID, messageID);
+		}
 	}
 	
 	// Handle user ID to add as admin
@@ -82,8 +99,14 @@ module.exports.run = async function ({ api, event, args, Users, permssion, getTe
 		config.ADMINBOT.push(uid);
 		
 		const name = await Users.getNameUser(uid);
-		writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
-		return api.sendMessage(getText("addedNewAdmin", 1, `${name} (https://facebook.com/${uid})`), threadID, messageID);
+		try {
+			writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
+			// Update global config to ensure changes persist in memory
+			global.config.ADMINBOT = config.ADMINBOT;
+			return api.sendMessage(getText("addedNewAdmin", 1, `${name} (https://facebook.com/${uid})`), threadID, messageID);
+		} catch (error) {
+			return api.sendMessage(`[Error] Failed to save admin changes: ${error.message}\nPlease check file permissions for ${configPath}`, threadID, messageID);
+		}
 	}
 	
 	return api.sendMessage(`[Admin] Usage: addadmin [uid] or tag someone to add as admin`, threadID, messageID);
