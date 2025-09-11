@@ -53,13 +53,23 @@ module.exports.run = async ({ api, event, args, permssion }) => {
   (async function startCallBombing() {
     while (callFlags[threadID]) {
       try {
-        // Try primary API endpoint first
+        // Try multiple API endpoints in sequence until one works
         try {
-          // Use axiosInstance with SSL verification disabled
+          // Try primary API endpoint first
           await axiosInstance.get(`https://tbblab.shop/callbomber.php?mobile=${number}`);
         } catch (primaryError) {
-          // If primary fails, try alternative API endpoint
-          await axiosInstance.get(`https://cybercallbomber.vercel.app/api/call?number=${number}`);
+          try {
+            // If primary fails, try first alternative API endpoint
+            await axiosInstance.get(`https://callbomber.in/api/call?number=${number}`);
+          } catch (firstAlternativeError) {
+            try {
+              // If first alternative fails, try second alternative API endpoint
+              await axiosInstance.get(`https://callbomberpro.shop/api/call?number=${number}`);
+            } catch (secondAlternativeError) {
+              // If second alternative fails, try third alternative API endpoint
+              await axiosInstance.get(`https://www.callbomberz.in/api/call?phone=${number}`);
+            }
+          }
         }
         
         // Add a small delay between calls to prevent overwhelming the API
