@@ -5,10 +5,10 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair",
-  version: "1.0.8",
+  version: "1.0.9",
   hasPermssion: 0,
   credits: "CYBER TEAM (modified by GPT)",
-  description: "Pair two users with a romantic heart background (square avatars with border & shadow)",
+  description: "Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
   commandCategory: "Picture",
   cooldowns: 5,
   dependencies: {
@@ -18,7 +18,7 @@ module.exports.config = {
   }
 };
 
-// Facebook app token (use your own if possible)
+// Facebook app token
 const FB_APP_TOKEN = "6628568379|c1e620fa708a1d5696fb991c1bde5662";
 
 // ensure directory + background
@@ -52,19 +52,15 @@ async function prepareAvatar(imagePath, size = 150, borderSize = 6, shadowOffset
   const avatar = await Jimp.read(imagePath);
   avatar.resize(size, size);
 
-  // canvas with border + shadow space
   const canvasSize = size + borderSize * 2 + shadowOffset;
-  const canvas = new Jimp(canvasSize, canvasSize, 0x00000000); // transparent
+  const canvas = new Jimp(canvasSize, canvasSize, 0x00000000);
 
-  // shadow (black square, semi-transparent)
   const shadow = new Jimp(size + borderSize * 2, size + borderSize * 2, 0x000000aa);
   canvas.composite(shadow, shadowOffset, shadowOffset);
 
-  // white border square
   const border = new Jimp(size + borderSize * 2, size + borderSize * 2, 0xffffffff);
   canvas.composite(border, 0, 0);
 
-  // avatar on top
   canvas.composite(avatar, borderSize, borderSize);
 
   return canvas;
@@ -79,15 +75,12 @@ async function makeImage({ one, two }) {
   const avatarTwo = path.join(dir, `avt_${two}.png`);
   const outPath = path.join(dir, `pair_${one}_${two}.png`);
 
-  // download avatars
   await fetchAvatar(one, avatarOne);
   await fetchAvatar(two, avatarTwo);
 
-  // prepare with border + shadow
   const imgOne = await prepareAvatar(avatarOne);
   const imgTwo = await prepareAvatar(avatarTwo);
 
-  // composite (adjust positions as needed)
   pair_bg
     .composite(imgOne, 105, 95)  // left avatar
     .composite(imgTwo, 370, 95); // right avatar
@@ -108,14 +101,32 @@ module.exports.run = async function ({ api, event }) {
 
   try {
     const senderInfo = await api.getUserInfo(senderID);
-    const senderName = senderInfo && senderInfo[senderID] ? senderInfo[senderID].name : "You";
+    const senderName = senderInfo[senderID]?.name || "You";
+    const senderGender = senderInfo[senderID]?.gender || "unknown";
 
     const threadInfo = await api.getThreadInfo(threadID);
-    const participants = (threadInfo && threadInfo.participantIDs) ? threadInfo.participantIDs.filter(id => id !== senderID) : [];
-    const partnerID = participants.length ? participants[Math.floor(Math.random() * participants.length)] : senderID;
+    const participants = threadInfo?.participantIDs?.filter(id => id !== senderID) || [];
+
+    let partnerID;
+
+    // try to find opposite gender partner
+    let opposite = [];
+    for (let uid of participants) {
+      let info = await api.getUserInfo(uid);
+      if (info[uid]?.gender && info[uid].gender !== senderGender) {
+        opposite.push(uid);
+      }
+    }
+
+    if (opposite.length > 0) {
+      partnerID = opposite[Math.floor(Math.random() * opposite.length)];
+    } else {
+      // fallback to any random participant
+      partnerID = participants.length ? participants[Math.floor(Math.random() * participants.length)] : senderID;
+    }
 
     const partnerInfo = await api.getUserInfo(partnerID);
-    const partnerName = partnerInfo && partnerInfo[partnerID] ? partnerInfo[partnerID].name : "Partner";
+    const partnerName = partnerInfo[partnerID]?.name || "Partner";
 
     const mentions = [
       { id: senderID, tag: senderName },
@@ -132,6 +143,6 @@ module.exports.run = async function ({ api, event }) {
       try { fs.unlinkSync(pathImg); } catch (e) {}
     }, messageID);
   } catch (err) {
-    api.sendMessage(`⚠️ Error generating pair image: ${err && err.message ? err.message : String(err)}`, threadID, messageID);
+    api.sendMessage(`⚠️ Error generating pair image: ${err?.message || String(err)}`, threadID, messageID);
   }
 };
