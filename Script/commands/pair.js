@@ -89,8 +89,8 @@ async function makeImage({ one, two }) {
 
   // composite (adjust positions as needed)
   pair_bg
-    .composite(imgOne, 100, 100)  // left avatar
-    .composite(imgTwo, 360, 100); // right avatar
+    .composite(imgOne, 105, 95)  // left avatar
+    .composite(imgTwo, 370, 95); // right avatar
 
   await pair_bg.writeAsync(outPath);
 
