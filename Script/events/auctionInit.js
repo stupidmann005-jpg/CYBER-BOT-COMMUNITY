@@ -9,9 +9,18 @@ module.exports.config = {
 const fs = require('fs-extra');
 const path = require('path');
 
+// Global flag to track if auction system has been initialized
+global.auctionSystemInitialized = false;
+
 module.exports.run = async function({ api, event, client }) {
     // Make sure this event runs only once when the bot starts
     console.log('Initializing auction system...');
+    
+    // Check if auction system is already initialized
+    if (global.auctionSystemInitialized) {
+        console.log('[AUCTION SYSTEM] Auction system already initialized, skipping');
+        return;
+    }
     
     // Create necessary cache directories and files
     const cachePath = path.join(__dirname, '..', '..', 'includes', 'cache');
@@ -68,30 +77,66 @@ module.exports.run = async function({ api, event, client }) {
             }
         }
         
-        // Start the auction cycle
+        // Start the auction cycle with enhanced logging
         try {
+            console.log('[AUCTION SYSTEM] Loading auction module...');
             const auctionModule = require('../commands/auction');
+            console.log('[AUCTION SYSTEM] Auction module loaded successfully');
+            
             if (typeof auctionModule.startAuctionCycle === 'function') {
+                console.log('[AUCTION SYSTEM] startAuctionCycle function found');
+                
                 // Store API in global for access by other components
                 if (!global.api && api) {
                     global.api = api;
-                    console.log('API stored in global for auction system');
+                    console.log('[AUCTION SYSTEM] API stored in global for auction system');
+                } else if (global.api) {
+                    console.log('[AUCTION SYSTEM] API already exists in global');
+                } else {
+                    console.error('[AUCTION SYSTEM] API not available!');
                 }
                 
                 // Start the auction cycle with a delay to ensure everything is loaded
+                console.log('[AUCTION SYSTEM] Setting up auction cycle with 10 second delay...');
                 setTimeout(() => {
-                    auctionModule.startAuctionCycle(api);
-                    console.log('Auction cycle started successfully from event');
-                }, 5000);
+                    try {
+                        console.log('[AUCTION SYSTEM] Attempting to start auction cycle...');
+                        auctionModule.startAuctionCycle(api);
+                        console.log('[AUCTION SYSTEM] Auction cycle started successfully from event');
+                    } catch (innerError) {
+                        console.error('[AUCTION SYSTEM] Error starting auction cycle from setTimeout:', innerError);
+                    }
+                }, 10000); // Increased to 10 seconds for better reliability
             } else {
-                console.error('Failed to start auction cycle: startAuctionCycle function not found');
+                console.error('[AUCTION SYSTEM] Failed to start auction cycle: startAuctionCycle function not found');
             }
         } catch (error) {
             console.error('Error starting auction cycle:', error);
         }
         
-        console.log('Auction system initialized successfully');
+        console.log('[AUCTION SYSTEM] Auction system initialized successfully');
+        
+        // Set the global flag to indicate that auction system has been initialized
+        global.auctionSystemInitialized = true;
+        
+        // Set up a recurring check to ensure auction is running
+        setInterval(() => {
+            try {
+                console.log('[AUCTION SYSTEM] Running periodic check for auction system');
+                if (!global.globalAuction || !global.globalAuction.isActive) {
+                    console.log('[AUCTION SYSTEM] No active auction found, attempting to restart auction cycle');
+                    const auctionModule = require('../commands/auction');
+                    if (typeof auctionModule.startAuctionCycle === 'function') {
+                        auctionModule.startAuctionCycle(api || global.api);
+                    }
+                } else {
+                    console.log('[AUCTION SYSTEM] Auction system is active and running');
+                }
+            } catch (checkError) {
+                console.error('[AUCTION SYSTEM] Error during periodic auction check:', checkError);
+            }
+        }, 15 * 60 * 1000); // Check every 15 minutes
     } catch (error) {
-        console.error('Error initializing auction system:', error);
+        console.error('[AUCTION SYSTEM] Error initializing auction system:', error);
     }
 };
