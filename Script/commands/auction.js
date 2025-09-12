@@ -1,0 +1,364 @@
+const fs = require('fs-extra');
+const path = require('path');
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+
+module.exports.config = {
+    name: "auction",
+    version: "1.0.0",
+    hasPermssion: 0,
+    credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
+    description: "View current auction or start a new one",
+    commandCategory: "economy",
+    usages: "",
+    cooldowns: 10
+};
+
+// Sample auction items
+const sampleItems = [
+    {
+        name: "Rare Diamond Ring",
+        description: "A stunning diamond ring with exceptional clarity",
+        imageURL: "https://i.imgur.com/JQpMcbj.jpg",
+        minimumBid: 1000
+    },
+    {
+        name: "Vintage Watch",
+        description: "A classic timepiece with intricate craftsmanship",
+        imageURL: "https://i.imgur.com/8BU2zJG.jpg",
+        minimumBid: 800
+    },
+    {
+        name: "Golden Crown",
+        description: "A symbol of royalty and power",
+        imageURL: "https://i.imgur.com/qgZLZdM.jpg",
+        minimumBid: 1500
+    },
+    {
+        name: "Mystic Sword",
+        description: "A legendary weapon said to possess magical powers",
+        imageURL: "https://i.imgur.com/YJfzYmR.jpg",
+        minimumBid: 1200
+    },
+    {
+        name: "Ancient Scroll",
+        description: "Contains forgotten knowledge from a lost civilization",
+        imageURL: "https://i.imgur.com/JNhqkpO.jpg",
+        minimumBid: 500
+    },
+    {
+        name: "Crystal Orb",
+        description: "A mysterious orb that glows with ethereal light",
+        imageURL: "https://i.imgur.com/8wqd1sD.jpg",
+        minimumBid: 700
+    },
+    {
+        name: "Enchanted Amulet",
+        description: "Grants protection against dark magic",
+        imageURL: "https://i.imgur.com/VrjWrqQ.jpg",
+        minimumBid: 900
+    },
+    {
+        name: "Dragon Scale Armor",
+        description: "Forged from the scales of an ancient dragon",
+        imageURL: "https://i.imgur.com/kYvQXmC.jpg",
+        minimumBid: 2000
+    },
+    {
+        name: "Phoenix Feather",
+        description: "A rare feather that never burns",
+        imageURL: "https://i.imgur.com/JZSWRmw.jpg",
+        minimumBid: 600
+    },
+    {
+        name: "Celestial Map",
+        description: "Charts the stars of distant galaxies",
+        imageURL: "https://i.imgur.com/QdBwMGP.jpg",
+        minimumBid: 1100
+    }
+];
+
+// Function to start the auction cycle
+module.exports.startAuctionCycle = async function(api) {
+    try {
+        // Start a new auction
+        await startNewAuction(api);
+        
+        // Schedule the next auction after 4 minutes (2 min auction + 2 min break)
+        setTimeout(() => {
+            module.exports.startAuctionCycle(api);
+        }, 4 * 60 * 1000);
+    } catch (error) {
+        console.error('Error in auction cycle:', error);
+        // Try to restart the cycle after a delay
+        setTimeout(() => {
+            module.exports.startAuctionCycle(api);
+        }, 5 * 60 * 1000);
+    }
+};
+
+// Function to start a new auction
+async function startNewAuction(api) {
+    // Select a random item
+    const randomItem = sampleItems[Math.floor(Math.random() * sampleItems.length)];
+    
+    // Generate a unique ID for this item
+    const itemId = uuidv4();
+    
+    // Set up auction details
+    global.globalAuction = {
+        isActive: true,
+        currentItem: {
+            id: itemId,
+            name: randomItem.name,
+            description: randomItem.description,
+            imageURL: randomItem.imageURL,
+            minimumBid: randomItem.minimumBid
+        },
+        startTime: new Date(),
+        endTime: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes from now
+        highestBid: randomItem.minimumBid,
+        highestBidder: null,
+        bids: []
+    };
+    
+    // Announce the auction in all active threads
+    const threads = await api.getThreadList(20, null, ['INBOX']);
+    for (const thread of threads) {
+        if (thread.isGroup) {
+            try {
+                // Download the image
+                const imagePath = path.join(__dirname, '..', '..', 'includes', 'cache', `auction_${itemId}.jpg`);
+                const imageResponse = await axios.get(randomItem.imageURL, { responseType: 'arraybuffer' });
+                await fs.writeFile(imagePath, Buffer.from(imageResponse.data));
+                
+                // Send the auction announcement with the image
+                await api.sendMessage(
+                    {
+                        body: `🔔 NEW AUCTION STARTED! 🔔\n\n` +
+                              `Item: ${randomItem.name}\n` +
+                              `Description: ${randomItem.description}\n` +
+                              `Starting Bid: $${randomItem.minimumBid}\n\n` +
+                              `⏰ This auction will end in 2 minutes!\n\n` +
+                              `To place a bid, use: !bid <amount>`,
+                        attachment: fs.createReadStream(imagePath)
+                    },
+                    thread.threadID
+                );
+            } catch (error) {
+                console.error(`Error announcing auction in thread ${thread.threadID}:`, error);
+            }
+        }
+    }
+    
+    // Set a timeout to end the auction
+    global.auctionTimeout = setTimeout(() => {
+        module.exports.endAuction(api);
+    }, 2 * 60 * 1000); // 2 minutes
+}
+
+// Function to end an auction
+module.exports.endAuction = async function(api, specificThreadID = null) {
+    if (!global.globalAuction || !global.globalAuction.isActive) {
+        return;
+    }
+    
+    // Mark the auction as inactive
+    global.globalAuction.isActive = false;
+    
+    const item = global.globalAuction.currentItem;
+    const highestBid = global.globalAuction.highestBid;
+    const highestBidderID = global.globalAuction.highestBidder;
+    
+    // Prepare announcement message
+    let endMessage;
+    
+    if (highestBidderID) {
+        // Someone won the auction
+        try {
+            // Get winner's name
+            const Users = require('../../includes/database/models/users');
+            const winnerData = await Users.getData(highestBidderID);
+            const winnerName = winnerData.name || "Unknown User";
+            
+            // Deduct money from winner's wallet
+            const Currencies = require('../../includes/database/models/currencies');
+            await Currencies.decreaseMoney(highestBidderID, highestBid);
+            
+            // Add item to winner's inventory
+            const inventoryPath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction_inventory.json');
+            let inventoryData = {};
+            
+            try {
+                if (fs.existsSync(inventoryPath)) {
+                    inventoryData = await fs.readJson(inventoryPath);
+                }
+            } catch (error) {
+                console.error('Error loading inventory:', error);
+                inventoryData = {};
+            }
+            
+            // Add to winner's inventory
+            const winnerInventory = inventoryData[highestBidderID] || [];
+            winnerInventory.push({
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                imageURL: item.imageURL,
+                minimumBid: item.minimumBid,
+                purchasePrice: highestBid,
+                purchaseDate: new Date().toISOString(),
+                isForSale: false,
+                salePrice: 0,
+                ownerID: highestBidderID
+            });
+            inventoryData[highestBidderID] = winnerInventory;
+            
+            // Save updated inventory
+            await fs.writeJson(inventoryPath, inventoryData, { spaces: 2 });
+            
+            // Record auction in history
+            const historyPath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction_history.json');
+            let historyData = [];
+            
+            try {
+                if (fs.existsSync(historyPath)) {
+                    historyData = await fs.readJson(historyPath);
+                }
+            } catch (error) {
+                console.error('Error loading auction history:', error);
+                historyData = [];
+            }
+            
+            // Add to history
+            historyData.push({
+                itemId: item.id,
+                itemName: item.name,
+                winnerID: highestBidderID,
+                winnerName: winnerName,
+                finalBid: highestBid,
+                auctionStart: global.globalAuction.startTime,
+                auctionEnd: new Date(),
+                bids: global.globalAuction.bids
+            });
+            
+            // Save updated history
+            await fs.writeJson(historyPath, historyData, { spaces: 2 });
+            
+            endMessage = `🎉 AUCTION ENDED! 🎉\n\n` +
+                       `Item: ${item.name}\n` +
+                       `Final Price: $${highestBid}\n` +
+                       `Winner: ${winnerName}\n\n` +
+                       `Congratulations! The item has been added to your inventory.\n` +
+                       `Use '!inventory' to view your items.`;
+        } catch (error) {
+            console.error('Error processing auction winner:', error);
+            endMessage = `🎉 AUCTION ENDED! 🎉\n\n` +
+                       `Item: ${item.name}\n` +
+                       `Final Price: $${highestBid}\n\n` +
+                       `There was an error processing the winner. Please contact an administrator.`;
+        }
+    } else {
+        // No bids were placed
+        endMessage = `🔔 AUCTION ENDED! 🔔\n\n` +
+                   `Item: ${item.name}\n` +
+                   `No bids were placed. The item remains unsold.`;
+    }
+    
+    // Announce the end of the auction
+    if (specificThreadID) {
+        // If a specific thread ID is provided, only announce there
+        await api.sendMessage(endMessage, specificThreadID);
+    } else {
+        // Otherwise announce in all active threads
+        const threads = await api.getThreadList(20, null, ['INBOX']);
+        for (const thread of threads) {
+            if (thread.isGroup) {
+                try {
+                    await api.sendMessage(endMessage, thread.threadID);
+                } catch (error) {
+                    console.error(`Error announcing auction end in thread ${thread.threadID}:`, error);
+                }
+            }
+        }
+    }
+    
+    // Clean up the image file
+    try {
+        const imagePath = path.join(__dirname, '..', '..', 'includes', 'cache', `auction_${item.id}.jpg`);
+        if (await fs.pathExists(imagePath)) {
+            await fs.unlink(imagePath);
+        }
+    } catch (error) {
+        console.error('Error cleaning up auction image:', error);
+    }
+    
+    // Clear the auction timeout
+    if (global.auctionTimeout) {
+        clearTimeout(global.auctionTimeout);
+        global.auctionTimeout = null;
+    }
+};
+
+module.exports.run = async function({ api, event }) {
+    const { threadID, messageID } = event;
+    
+    if (!global.globalAuction || !global.globalAuction.isActive) {
+        return api.sendMessage(
+            "There is no active auction right now.\n\n" +
+            "A new auction will start automatically soon.\n\n" +
+            "In the meantime, you can:\n" +
+            "- Check your inventory with '!inventory'\n" +
+            "- Browse items for sale with '!marketplace'\n" +
+            "- Buy items with '!buy <item ID>'\n" +
+            "- Sell your items with '!sell <item ID> <price>'",
+            threadID, messageID
+        );
+    }
+    
+    const item = global.globalAuction.currentItem;
+    const highestBid = global.globalAuction.highestBid;
+    let highestBidderName = "No bids yet";
+    
+    if (global.globalAuction.highestBidder) {
+        const Users = require('../../includes/database/models/users');
+        const userData = await Users.getData(global.globalAuction.highestBidder);
+        highestBidderName = userData.name || "Unknown User";
+    }
+    
+    // Calculate time remaining
+    const now = new Date();
+    const endTime = new Date(global.globalAuction.endTime);
+    const timeLeftMs = endTime - now;
+    const minutesLeft = Math.floor(timeLeftMs / 60000);
+    const secondsLeft = Math.floor((timeLeftMs % 60000) / 1000);
+    
+    // Download the image
+    const imagePath = path.join(__dirname, '..', '..', 'includes', 'cache', `auction_${item.id}.jpg`);
+    let attachment = null;
+    
+    try {
+        if (!await fs.pathExists(imagePath)) {
+            const imageResponse = await axios.get(item.imageURL, { responseType: 'arraybuffer' });
+            await fs.writeFile(imagePath, Buffer.from(imageResponse.data));
+        }
+        attachment = fs.createReadStream(imagePath);
+    } catch (error) {
+        console.error('Error downloading auction image:', error);
+    }
+    
+    // Send auction status
+    return api.sendMessage(
+        {
+            body: `🔔 CURRENT AUCTION 🔔\n\n` +
+                  `Item: ${item.name}\n` +
+                  `Description: ${item.description}\n` +
+                  `Current Bid: $${highestBid}\n` +
+                  `Highest Bidder: ${highestBidderName}\n` +
+                  `Time Remaining: ${minutesLeft}m ${secondsLeft}s\n\n` +
+                  `To place a bid, use: !bid <amount>`,
+            attachment: attachment
+        },
+        threadID, messageID
+    );
+};
