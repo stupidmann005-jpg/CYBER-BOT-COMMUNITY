@@ -23,9 +23,10 @@ module.exports.config = {
 // Add onLoad function to initialize the auction when the bot starts
 module.exports.onLoad = async function() {
     try {
-        console.log('Auction command loaded successfully');
+        console.log('[AUCTION SYSTEM] Auction command loaded successfully');
         // Initialize global auction state if not already initialized
         if (!global.globalAuction) {
+            console.log('[AUCTION SYSTEM] Initializing global auction state');
             global.globalAuction = {
                 isActive: false,
                 currentItem: null,
@@ -33,20 +34,39 @@ module.exports.onLoad = async function() {
                 endTime: null,
                 highestBid: 0,
                 highestBidder: null,
-                bids: []
+                bids: [],
+                lastCheck: Date.now() // Add timestamp for monitoring
             };
+            console.log('[AUCTION SYSTEM] Global auction state initialized');
+        } else {
+            console.log('[AUCTION SYSTEM] Global auction state already exists');
+            // Update the lastCheck timestamp
+            global.globalAuction.lastCheck = Date.now();
+        }
+        
+        // Register this module globally for easier access
+        if (!global.auctionModule) {
+            global.auctionModule = module.exports;
+            console.log('[AUCTION SYSTEM] Auction module registered globally');
         }
         
         // Start the auction cycle automatically when the command is loaded
         // Use setTimeout to ensure the bot is fully initialized before starting auctions
+        console.log('[AUCTION SYSTEM] Setting up auction cycle from onLoad with 15 second delay...');
         setTimeout(() => {
-            console.log('Starting auction cycle from onLoad...');
+            console.log('[AUCTION SYSTEM] Attempting to start auction cycle from onLoad...');
             if (typeof this.startAuctionCycle === 'function') {
+                console.log('[AUCTION SYSTEM] startAuctionCycle function found in onLoad');
                 // Get the api instance from global
                 const api = global.api;
                 if (api) {
-                    this.startAuctionCycle(api);
-                    console.log('Auction cycle started automatically from command onLoad');
+                    console.log('[AUCTION SYSTEM] API found in global, starting auction cycle...');
+                    try {
+                        this.startAuctionCycle(api);
+                        console.log('[AUCTION SYSTEM] Auction cycle started successfully from command onLoad');
+                    } catch (cycleError) {
+                        console.error('[AUCTION SYSTEM] Error starting auction cycle from onLoad:', cycleError);
+                    }
                 } else {
                     console.error('Cannot start auction cycle: API not available');
                 }
@@ -125,18 +145,58 @@ const sampleItems = [
 
 // Function to start the auction cycle
 module.exports.startAuctionCycle = async function(api) {
+    console.log('[AUCTION SYSTEM] startAuctionCycle function called');
+    
+    // Update the last check timestamp
+    if (global.globalAuction) {
+        global.globalAuction.lastCheck = Date.now();
+    }
+    
+    // Ensure we have a valid API
+    if (!api) {
+        console.error('[AUCTION SYSTEM] API not provided to startAuctionCycle, attempting to use global.api');
+        api = global.api;
+        if (!api) {
+            console.error('[AUCTION SYSTEM] No API available, cannot start auction cycle');
+            
+            // Set up a retry mechanism
+            console.log('[AUCTION SYSTEM] Setting up retry for auction cycle in 30 seconds');
+            setTimeout(() => {
+                console.log('[AUCTION SYSTEM] Retrying to start auction cycle');
+                if (global.api) {
+                    module.exports.startAuctionCycle(global.api);
+                } else {
+                    console.error('[AUCTION SYSTEM] Still no API available after retry');
+                }
+            }, 30000);
+            return;
+        }
+    }
+    
+    // Store API in global for future use if not already there
+    if (!global.api && api) {
+        global.api = api;
+        console.log('[AUCTION SYSTEM] API stored in global from startAuctionCycle');
+    }
+    
     try {
+        console.log('[AUCTION SYSTEM] Starting new auction...');
         // Start a new auction
         await startNewAuction(api);
+        console.log('[AUCTION SYSTEM] New auction started successfully');
         
         // Schedule the next auction after 4 minutes (2 min auction + 2 min break)
+        console.log('[AUCTION SYSTEM] Scheduling next auction cycle in 4 minutes');
         setTimeout(() => {
+            console.log('[AUCTION SYSTEM] Time elapsed, starting next auction cycle');
             module.exports.startAuctionCycle(api);
         }, 4 * 60 * 1000);
     } catch (error) {
-        console.error('Error in auction cycle:', error);
+        console.error('[AUCTION SYSTEM] Error in auction cycle:', error);
         // Try to restart the cycle after a delay
+        console.log('[AUCTION SYSTEM] Will attempt to restart auction cycle in 5 minutes');
         setTimeout(() => {
+            console.log('[AUCTION SYSTEM] Attempting to restart auction cycle after error');
             module.exports.startAuctionCycle(api);
         }, 5 * 60 * 1000);
     }
@@ -144,8 +204,16 @@ module.exports.startAuctionCycle = async function(api) {
 
 // Function to start a new auction
 async function startNewAuction(api) {
+    console.log('[AUCTION SYSTEM] startNewAuction function called');
+    if (!api) {
+        console.error('[AUCTION SYSTEM] API not provided to startNewAuction, cannot proceed');
+        return;
+    }
+    
     // Select a random item
+    console.log('[AUCTION SYSTEM] Selecting random item for auction');
     const randomItem = sampleItems[Math.floor(Math.random() * sampleItems.length)];
+    console.log(`[AUCTION SYSTEM] Selected item: ${randomItem.name}`);
     
     // Generate a unique ID for this item
     const itemId = uuidv4();
