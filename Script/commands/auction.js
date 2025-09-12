@@ -36,6 +36,24 @@ module.exports.onLoad = async function() {
                 bids: []
             };
         }
+        
+        // Start the auction cycle automatically when the command is loaded
+        // Use setTimeout to ensure the bot is fully initialized before starting auctions
+        setTimeout(() => {
+            console.log('Starting auction cycle from onLoad...');
+            if (typeof this.startAuctionCycle === 'function') {
+                // Get the api instance from global
+                const api = global.api;
+                if (api) {
+                    this.startAuctionCycle(api);
+                    console.log('Auction cycle started automatically from command onLoad');
+                } else {
+                    console.error('Cannot start auction cycle: API not available');
+                }
+            } else {
+                console.error('startAuctionCycle function not found in auction command');
+            }
+        }, 10000); // Wait 10 seconds after bot starts to begin auction cycle
     } catch (error) {
         console.error('Error initializing auction command:', error);
     }
@@ -46,13 +64,13 @@ const sampleItems = [
     {
         name: "Rare Diamond Ring",
         description: "A stunning diamond ring with exceptional clarity",
-        imageURL: "https://cdn.shopify.com/s/files/1/0536/3086/1474/files/Lozenge_Diamond_480x480.jpg?v=1685329997",
+        imageURL: "https://i.imgur.com/JQpMcbj.jpg",
         minimumBid: 1000
     },
     {
         name: "Vintage Watch",
         description: "A classic timepiece with intricate craftsmanship",
-        imageURL: "https://i.postimg.cc/GhpMJ9QL/ezgif-60bbfb4a5a1cb5.jpg",
+        imageURL: "https://i.imgur.com/8BU2zJG.jpg",
         minimumBid: 800
     },
     {
