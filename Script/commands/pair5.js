@@ -23,7 +23,7 @@ module.exports.onLoad = async () => {
   if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
   if (!existsSync(path)) {
     await downloadFile(
-      "https://png.pngtree.com/thumb_back/fh260/background/20240204/pngtree-lovely-happy-valentines-day-background-with-realistic-3d-hearts-design-image_15600712.png",
+      "https://i.postimg.cc/44zpjGWD/background-for-the-festival-of-love-and-valentine-video.jpg",
       path
     );
   }
