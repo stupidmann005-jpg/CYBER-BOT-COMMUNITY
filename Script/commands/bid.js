@@ -6,90 +6,95 @@ module.exports.config = {
     version: "1.0.0",
     hasPermssion: 0,
     credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
-    description: "Place a bid on the current auction item",
+    description: "Place a bid in the current auction",
     commandCategory: "economy",
-    usages: "<amount>",
-    cooldowns: 3
+    usages: "[amount]",
+    cooldowns: 5,
+    dependencies: {
+        "fs-extra": "",
+        "path": ""
+    }
 };
 
-module.exports.run = async function({ api, event, args, Currencies, Users }) {
+module.exports.run = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
+    
+    console.log('Bid command executed');
     
     // Check if there's an active auction
     if (!global.globalAuction || !global.globalAuction.isActive) {
         return api.sendMessage(
-            "❌ There is no active auction right now.\n\n" +
-            "Use '!auction' to start a new auction.",
+            "There is no active auction right now. Use '!auction' to check when the next auction will start.",
             threadID, messageID
         );
     }
     
-    // Parse bid amount
+    // Get the bid amount
     const bidAmount = parseInt(args[0]);
-    
     if (isNaN(bidAmount) || bidAmount <= 0) {
-        return api.sendMessage("❌ Please enter a valid bid amount.", threadID, messageID);
+        return api.sendMessage(
+            "Please enter a valid bid amount. Example: !bid 1000",
+            threadID, messageID
+        );
     }
     
-    // Check if auction is still active
-    if (new Date() > global.globalAuction.endTime) {
-        return api.sendMessage("❌ This auction has already ended.", threadID, messageID);
-    }
-    
-    // Check if bid is higher than current highest bid
+    // Check if the bid is higher than the current highest bid
     if (bidAmount <= global.globalAuction.highestBid) {
         return api.sendMessage(
-            `❌ Your bid must be higher than the current highest bid of $${global.globalAuction.highestBid}.`,
+            `Your bid must be higher than the current highest bid of $${global.globalAuction.highestBid}.`,
             threadID, messageID
         );
     }
     
-    // Check if user has enough money
-    const userData = await Currencies.getData(senderID);
-    const userMoney = userData.money || 0;
-    
-    if (bidAmount > userMoney) {
-        return api.sendMessage(
-            `❌ You don't have enough money to place this bid. Your balance: $${userMoney}`,
-            threadID, messageID
-        );
-    }
-    
-    // Get user's name
-    const userName = await Users.getNameUser(senderID);
-    
-    // Update auction state
-    global.globalAuction.highestBid = bidAmount;
-    global.globalAuction.highestBidder = senderID;
-    global.globalAuction.bids.push({
-        bidderID: senderID,
-        amount: bidAmount,
-        timestamp: new Date()
-    });
-    
-    // Extend auction time if bid is placed in last 30 seconds
-    const timeLeft = global.globalAuction.endTime - new Date();
-    if (timeLeft < 30000) { // less than 30 seconds
-        global.globalAuction.endTime = new Date(Date.now() + 30000); // extend by 30 seconds
+    try {
+        // Check if the user has enough money
+        const userMoney = await Currencies.getData(senderID);
+        const userBalance = userMoney.money || 0;
         
-        // Reset the timeout
-        clearTimeout(global.auctionTimeout);
-        global.auctionTimeout = setTimeout(() => {
-            // Import the auction module to call endAuction
-            const auctionModule = require('./auction');
-            if (typeof auctionModule.endAuction === 'function') {
-                auctionModule.endAuction(api, threadID);
-            }
-        }, 30000);
+        if (userBalance < bidAmount) {
+            return api.sendMessage(
+                `You don't have enough money to place this bid. Your balance: $${userBalance}`,
+                threadID, messageID
+            );
+        }
+        
+        // Get user's name
+        const userData = await Users.getData(senderID);
+        const userName = userData.name || "Unknown User";
+        
+        // Update auction state
+        global.globalAuction.highestBid = bidAmount;
+        global.globalAuction.highestBidder = senderID;
+        
+        // Record the bid
+        global.globalAuction.bids.push({
+            userID: senderID,
+            userName: userName,
+            amount: bidAmount,
+            time: new Date()
+        });
+        
+        // Calculate time remaining
+        const now = new Date();
+        const endTime = new Date(global.globalAuction.endTime);
+        const timeLeftMs = endTime - now;
+        const minutesLeft = Math.floor(timeLeftMs / 60000);
+        const secondsLeft = Math.floor((timeLeftMs % 60000) / 1000);
+        
+        // Announce the new bid
+        return api.sendMessage(
+            `🎉 NEW HIGHEST BID! 🎉\n\n` +
+            `Item: ${global.globalAuction.currentItem.name}\n` +
+            `New Highest Bid: $${bidAmount}\n` +
+            `Bidder: ${userName}\n` +
+            `Time Remaining: ${minutesLeft}m ${secondsLeft}s`,
+            threadID, messageID
+        );
+    } catch (error) {
+        console.error('Error processing bid:', error);
+        return api.sendMessage(
+            "There was an error processing your bid. Please try again later.",
+            threadID, messageID
+        );
     }
-    
-    // Deduct money from user's wallet (will be finalized when auction ends)
-    // This is just a reservation, money will be deducted only if the user wins
-    
-    // Notify about the bid
-    return api.sendMessage(
-        `✅ ${userName} has placed a bid of $${bidAmount}!\n\n` +
-        `This is now the highest bid for ${global.globalAuction.currentItem.name}.`,
-        threadID, messageID
-    );
 };
