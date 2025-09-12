@@ -23,7 +23,7 @@ module.exports.onLoad = async () => {
   if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
   if (!existsSync(path)) {
     await downloadFile(
-      "https://static.vecteezy.com/system/resources/thumbnails/036/031/489/small_2x/ai-generated-a-couple-of-love-standing-in-a-colorful-night-background-generative-ai-photo.jpg",
+      "https://i.postimg.cc/44zpjGWD/background-for-the-festival-of-love-and-valentine-video.jpg",
       path
     );
   }
