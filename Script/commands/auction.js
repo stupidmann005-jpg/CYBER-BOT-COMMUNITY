@@ -19,13 +19,13 @@ const sampleItems = [
     {
         name: "Rare Diamond Ring",
         description: "A stunning diamond ring with exceptional clarity",
-        imageURL: "https://i.imgur.com/JQpMcbj.jpg",
+        imageURL: "https://i.postimg.cc/wx5KbtLD/unique-diamond-ring-shield-shaped-diamond.jpg",
         minimumBid: 1000
     },
     {
         name: "Vintage Watch",
         description: "A classic timepiece with intricate craftsmanship",
-        imageURL: "https://i.imgur.com/8BU2zJG.jpg",
+        imageURL: "https://i.postimg.cc/GhpMJ9QL/ezgif-60bbfb4a5a1cb5.jpg",
         minimumBid: 800
     },
     {
