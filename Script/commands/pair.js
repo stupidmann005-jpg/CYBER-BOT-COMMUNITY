@@ -48,7 +48,7 @@ async function fetchAvatar(fbId, outPath) {
 }
 
 // prepare avatar with border + shadow
-async function prepareAvatar(imagePath, size = 250, borderSize = 6, shadowOffset = 6) {
+async function prepareAvatar(imagePath, size = 350, borderSize = 8, shadowOffset = 8) {
   const avatar = await Jimp.read(imagePath);
   avatar.resize(size, size);
 
@@ -82,8 +82,8 @@ async function makeImage({ one, two }) {
   const imgTwo = await prepareAvatar(avatarTwo);
 
   pair_bg
-    .composite(imgOne, 105, 95)  // left avatar
-    .composite(imgTwo, 370, 95); // right avatar
+    .composite(imgOne, 205, 180)  // left avatar
+    .composite(imgTwo, 700, 180); // right avatar
 
   await pair_bg.writeAsync(outPath);
 
