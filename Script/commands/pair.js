@@ -48,7 +48,7 @@ async function fetchAvatar(fbId, outPath) {
 }
 
 // prepare avatar with border + shadow
-async function prepareAvatar(imagePath, size = 150, borderSize = 6, shadowOffset = 6) {
+async function prepareAvatar(imagePath, size = 250, borderSize = 6, shadowOffset = 6) {
   const avatar = await Jimp.read(imagePath);
   avatar.resize(size, size);
 
