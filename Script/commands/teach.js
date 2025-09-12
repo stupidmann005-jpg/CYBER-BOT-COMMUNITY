@@ -19,7 +19,7 @@ module.exports.run = async function({ api, event, args, Users, permssion }) {
     const query = args.join(" ");
     
     if (!query) {
-      return api.sendMessage("❌ | Please use:\n- teach [Question] - [Reply] (to add)\n- teach remove [Question] (admin only)\n- teach list (to see total teachings stats)\n- teach mylist (to see your specific teachings)\n\n⚠️ Note: If 'list' or 'mylist' doesn't work, the API server might be down or experiencing issues.", event.threadID, event.messageID);
+      return api.sendMessage("❌ | Please use:\n- teach [Question] - [Reply] (to add)\n- teach remove [Question] - [Reply] (admin only)\n- teach list (to see total teachings stats)\n- teach mylist (to see your specific teachings)\n\n⚠️ Note: If 'list' or 'mylist' doesn't work, the API server might be down or experiencing issues.", event.threadID, event.messageID);
     }
     
     // Handle remove command (admin only)
@@ -29,24 +29,35 @@ module.exports.run = async function({ api, event, args, Users, permssion }) {
         return api.sendMessage("❌ | Only admins can remove teachings.", event.threadID, event.messageID);
       }
       
-      const questionToRemove = args.slice(1).join(" ");
-      if (!questionToRemove) {
-        return api.sendMessage("❌ | Please specify the question to remove.", event.threadID, event.messageID);
+      // Check if the format is correct (question - answer)
+      const removeText = args.slice(1).join(" ");
+      const parts = removeText.split(" - ");
+      
+      if (parts.length < 2) {
+        return api.sendMessage("❌ | Please use: teach remove [Question] - [Reply]", event.threadID, event.messageID);
       }
       
+      const [ask, ans] = parts;
+      
       // Call API to remove the teaching
-      // First try the /remove endpoint
+      // First try the /delete endpoint which is used in baby.js
       try {
-        const res = await axios.get(`${simsim}/remove?ask=${encodeURIComponent(questionToRemove)}`);
+        const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
         return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
-      } catch (removeErr) {
-        // If /remove fails, try the /delete endpoint which is used in baby.js
+      } catch (deleteErr) {
+        // If /delete fails, try the /remove endpoint
         try {
-          const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(questionToRemove)}`);
+          const res = await axios.get(`${simsim}/remove?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
           return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
-        } catch (deleteErr) {
-          console.error("Error removing teaching:", deleteErr);
-          return api.sendMessage("❌ | Failed to remove teaching. The API might be down or the question doesn't exist.", event.threadID, event.messageID);
+        } catch (removeErr) {
+          // Try with just the ask parameter as a last resort
+          try {
+            const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}`);
+            return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
+          } catch (finalErr) {
+            console.error("Error removing teaching:", finalErr);
+            return api.sendMessage("❌ | Failed to remove teaching. The API might be down or the question doesn't exist.", event.threadID, event.messageID);
+          }
         }
       }
     }
