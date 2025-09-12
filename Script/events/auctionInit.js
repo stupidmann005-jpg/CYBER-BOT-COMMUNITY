@@ -9,7 +9,8 @@ module.exports.config = {
 const fs = require('fs-extra');
 const path = require('path');
 
-module.exports.run = async function({ api, event }) {
+module.exports.run = async function({ api, event, client }) {
+    // Make sure this event runs only once when the bot starts
     console.log('Initializing auction system...');
     
     // Create necessary cache directories and files
@@ -48,13 +49,36 @@ module.exports.run = async function({ api, event }) {
             bids: []
         };
         
-        // Start the auction cycle
-        const auctionModule = require('../commands/auction');
-        if (typeof auctionModule.startAuctionCycle === 'function') {
-            auctionModule.startAuctionCycle(api);
-            console.log('Auction cycle started successfully');
+        // Check if the auction command is registered in the bot's command list
+        if (!global.client || !global.client.commands) {
+            console.error('Bot client or commands not initialized yet');
         } else {
-            console.error('Failed to start auction cycle: startAuctionCycle function not found');
+            // Make sure the auction command is loaded
+            if (!global.client.commands.has('auction')) {
+                try {
+                    // Try to load the auction command manually
+                    const auctionModule = require('../commands/auction');
+                    global.client.commands.set('auction', auctionModule);
+                    console.log('Auction command loaded manually');
+                } catch (error) {
+                    console.error('Failed to load auction command:', error);
+                }
+            } else {
+                console.log('Auction command already loaded');
+            }
+        }
+        
+        // Start the auction cycle
+        try {
+            const auctionModule = require('../commands/auction');
+            if (typeof auctionModule.startAuctionCycle === 'function') {
+                auctionModule.startAuctionCycle(api);
+                console.log('Auction cycle started successfully');
+            } else {
+                console.error('Failed to start auction cycle: startAuctionCycle function not found');
+            }
+        } catch (error) {
+            console.error('Error starting auction cycle:', error);
         }
         
         console.log('Auction system initialized successfully');
