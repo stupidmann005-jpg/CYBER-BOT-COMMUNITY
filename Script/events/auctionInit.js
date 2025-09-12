@@ -72,8 +72,17 @@ module.exports.run = async function({ api, event, client }) {
         try {
             const auctionModule = require('../commands/auction');
             if (typeof auctionModule.startAuctionCycle === 'function') {
-                auctionModule.startAuctionCycle(api);
-                console.log('Auction cycle started successfully');
+                // Store API in global for access by other components
+                if (!global.api && api) {
+                    global.api = api;
+                    console.log('API stored in global for auction system');
+                }
+                
+                // Start the auction cycle with a delay to ensure everything is loaded
+                setTimeout(() => {
+                    auctionModule.startAuctionCycle(api);
+                    console.log('Auction cycle started successfully from event');
+                }, 5000);
             } else {
                 console.error('Failed to start auction cycle: startAuctionCycle function not found');
             }
