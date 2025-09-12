@@ -6,58 +6,65 @@ module.exports.config = {
     version: "1.0.0",
     hasPermssion: 0,
     credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
-    description: "View your owned auction items",
+    description: "View your auction inventory",
     commandCategory: "economy",
     usages: "",
-    cooldowns: 10
+    cooldowns: 5,
+    dependencies: {
+        "fs-extra": "",
+        "path": ""
+    }
 };
 
 module.exports.run = async function({ api, event, args, Users }) {
     const { threadID, messageID, senderID } = event;
     
-    // Load user's inventory
-    let userInventory = [];
+    console.log('Inventory command executed');
     
     try {
-        // Check if inventory data file exists
-        const inventoryPath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction_inventory.json');
+        // Get user's name
+        const userData = await Users.getData(senderID);
+        const userName = userData.name || "Unknown User";
         
-        if (fs.existsSync(inventoryPath)) {
-            const inventoryData = await fs.readJson(inventoryPath);
-            userInventory = inventoryData[senderID] || [];
+        // Load inventory data
+        const inventoryPath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction_inventory.json');
+        let inventoryData = {};
+        
+        if (await fs.pathExists(inventoryPath)) {
+            inventoryData = await fs.readJson(inventoryPath);
         }
+        
+        // Get user's inventory
+        const userInventory = inventoryData[senderID] || [];
+        
+        if (userInventory.length === 0) {
+            return api.sendMessage(
+                `${userName}, you don't have any items in your inventory.\n\n` +
+                `Participate in auctions to win items!`,
+                threadID, messageID
+            );
+        }
+        
+        // Format inventory items
+        let inventoryMessage = `🎒 ${userName}'s Inventory 🎒\n\n`;
+        
+        userInventory.forEach((item, index) => {
+            inventoryMessage += `${index + 1}. ${item.name}\n` +
+                               `   Description: ${item.description}\n` +
+                               `   Purchased for: $${item.purchasePrice}\n` +
+                               `   Date acquired: ${new Date(item.purchaseDate).toLocaleDateString()}\n` +
+                               `   Status: ${item.isForSale ? `For sale at $${item.salePrice}` : 'Not for sale'}\n\n`;
+        });
+        
+        inventoryMessage += `Use '!sell <item number> <price>' to list an item for sale.\n` +
+                           `Use '!unsell <item number>' to remove an item from sale.`;
+        
+        return api.sendMessage(inventoryMessage, threadID, messageID);
     } catch (error) {
-        console.error('Error loading inventory:', error);
-        userInventory = [];
-    }
-    
-    // Get user's name
-    const userName = await Users.getNameUser(senderID);
-    
-    if (userInventory.length === 0) {
+        console.error('Error retrieving inventory:', error);
         return api.sendMessage(
-            `👝 ${userName}'s Inventory\n\n` +
-            `You don't own any auction items yet.\n\n` +
-            `Participate in auctions using the '!auction' command and bid on items with '!bid <amount>' to win items!`,
+            "There was an error retrieving your inventory. Please try again later.",
             threadID, messageID
         );
     }
-    
-    // Format inventory items
-    let inventoryMessage = `👝 ${userName}'s Inventory\n\n`;
-    
-    for (let i = 0; i < userInventory.length; i++) {
-        const item = userInventory[i];
-        const forSaleText = item.isForSale ? `🏷️ For Sale: $${item.salePrice}` : '🔒 Not For Sale';
-        
-        inventoryMessage += `${i + 1}. ${item.name}\n`;
-        inventoryMessage += `   Description: ${item.description}\n`;
-        inventoryMessage += `   ${forSaleText}\n`;
-        inventoryMessage += `   ID: ${item.id}\n\n`;
-    }
-    
-    inventoryMessage += `Use '!sell <item ID> <price>' to put an item up for sale.\n`;
-    inventoryMessage += `Use '!unsell <item ID>' to remove an item from sale.`;
-    
-    return api.sendMessage(inventoryMessage, threadID, messageID);
 };
