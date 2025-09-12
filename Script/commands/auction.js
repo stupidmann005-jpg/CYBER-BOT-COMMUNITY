@@ -84,61 +84,61 @@ const sampleItems = [
     {
         name: "Rare Diamond Ring",
         description: "A stunning diamond ring with exceptional clarity",
-        imageURL: "https://i.imgur.com/JQpMcbj.jpg",
+        imageURL: "https://i.postimg.cc/wx5KbtLD/unique-diamond-ring-shield-shaped-diamond.jpg",
         minimumBid: 1000
     },
     {
         name: "Vintage Watch",
         description: "A classic timepiece with intricate craftsmanship",
-        imageURL: "https://i.imgur.com/8BU2zJG.jpg",
+        imageURL: "https://i.postimg.cc/GhpMJ9QL/ezgif-60bbfb4a5a1cb5.jpg",
         minimumBid: 800
     },
     {
         name: "Golden Crown",
         description: "A symbol of royalty and power",
-        imageURL: "https://i.imgur.com/qgZLZdM.jpg",
+        imageURL: "https://i.postimg.cc/667dcRZp/images.jpg",
         minimumBid: 1500
     },
     {
         name: "Mystic Sword",
         description: "A legendary weapon said to possess magical powers",
-        imageURL: "https://i.imgur.com/YJfzYmR.jpg",
+        imageURL: "https://i.postimg.cc/65JL0zfW/ai-generated-9306969-1280.jpg",
         minimumBid: 1200
     },
     {
         name: "Ancient Scroll",
         description: "Contains forgotten knowledge from a lost civilization",
-        imageURL: "https://i.imgur.com/JNhqkpO.jpg",
+        imageURL: "https://i.postimg.cc/44zpjGWD/background-for-the-festival-of-love-and-valentine-video.jpg",
         minimumBid: 500
     },
     {
         name: "Crystal Orb",
         description: "A mysterious orb that glows with ethereal light",
-        imageURL: "https://i.imgur.com/8wqd1sD.jpg",
+        imageURL: "https://i.postimg.cc/vZS4PZwr/love-heart-purple-1920x1080-11966.jpg",
         minimumBid: 700
     },
     {
         name: "Enchanted Amulet",
         description: "Grants protection against dark magic",
-        imageURL: "https://i.imgur.com/VrjWrqQ.jpg",
+        imageURL: "https://i.postimg.cc/RVW57SG5/542687008-794217279830992-5252331623237469996-n.jpg",
         minimumBid: 900
     },
     {
         name: "Dragon Scale Armor",
         description: "Forged from the scales of an ancient dragon",
-        imageURL: "https://i.imgur.com/kYvQXmC.jpg",
+        imageURL: "https://i.postimg.cc/zXxwr51B/download.jpg",
         minimumBid: 2000
     },
     {
         name: "Phoenix Feather",
         description: "A rare feather that never burns",
-        imageURL: "https://i.imgur.com/JZSWRmw.jpg",
+        imageURL: "https://i.postimg.cc/jdx6m2mm/download-1.jpg",
         minimumBid: 600
     },
     {
         name: "Celestial Map",
         description: "Charts the stars of distant galaxies",
-        imageURL: "https://i.imgur.com/QdBwMGP.jpg",
+        imageURL: "https://i.postimg.cc/MpX7Z4WY/download-2.jpg",
         minimumBid: 1100
     }
 ];
