@@ -19,7 +19,7 @@ module.exports.run = async function({ api, event, args, Users, permssion }) {
     const query = args.join(" ");
     
     if (!query) {
-      return api.sendMessage("❌ | Please use:\n- teach [Question] - [Reply] (to add)\n- teach remove [Question] - [Reply] (admin only)\n- teach list (to see total teachings stats)\n- teach mylist (to see your specific teachings)\n\n⚠️ Note: If 'list' or 'mylist' doesn't work, the API server might be down or experiencing issues.", event.threadID, event.messageID);
+      return api.sendMessage("❌ | Please use:\n- teach [Question] - [Reply] (to add)\n- teach remove [Question] - [Reply] (admin only, both question and reply required, admins can remove any teaching, regular users can only remove their own)\n- teach list (to see total teachings stats)\n- teach mylist (to see your specific teachings)\n\n⚠️ Note: If 'list' or 'mylist' doesn't work, the API server might be down or experiencing issues.", event.threadID, event.messageID);
     }
     
     // Handle remove command (admin only)
@@ -31,32 +31,95 @@ module.exports.run = async function({ api, event, args, Users, permssion }) {
       
       // Check if the format is correct (question - answer)
       const removeText = args.slice(1).join(" ");
-      const parts = removeText.split(" - ");
       
+      // More flexible splitting to handle various formats
+      // First try to split by " - " (standard format)
+      let parts = removeText.split(" - ");
+      
+      // If that doesn't work, try to find the last occurrence of " - "
       if (parts.length < 2) {
-        return api.sendMessage("❌ | Please use: teach remove [Question] - [Reply]", event.threadID, event.messageID);
+        const lastDashIndex = removeText.lastIndexOf(" - ");
+        if (lastDashIndex !== -1) {
+          parts = [
+            removeText.substring(0, lastDashIndex),
+            removeText.substring(lastDashIndex + 3) // +3 to skip " - "
+          ];
+        }
       }
       
-      const [ask, ans] = parts;
+      if (parts.length < 2) {
+        return api.sendMessage("❌ | Missing parameters! Required: ask & ans\nPlease use: teach remove [Question] - [Reply]", event.threadID, event.messageID);
+      }
+      
+      // Trim whitespace from both parts
+      const ask = parts[0].trim();
+      const ans = parts[1].trim();
       
       // Call API to remove the teaching
-      // First try the /delete endpoint which is used in baby.js
+      // Try the endpoints in order of most likely to work
+      // Add isAdmin parameter to allow admins to remove any teaching
+      const isAdmin = permssion >= 1 ? 1 : 0;
+      
+      // Function to try API call with and without isAdmin parameter
+      const tryApiCall = async (url) => {
+        try {
+          // First try with isAdmin parameter
+          return await axios.get(url);
+        } catch (err) {
+          // If that fails, try without isAdmin parameter (for backward compatibility)
+          // Remove isAdmin from URL
+          const urlWithoutAdmin = url.replace(/&isAdmin=\d+/, '');
+          if (urlWithoutAdmin !== url) { // Only retry if URL was changed
+            return await axios.get(urlWithoutAdmin);
+          }
+          throw err; // Re-throw if we didn't modify the URL
+        }
+      };
+      
       try {
-        const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
+        // First try the /delete endpoint with both parameters and user identification
+        const url = `${simsim}/delete?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderID=${uid}&senderName=${encodeURIComponent(senderName)}&isAdmin=${isAdmin}`;
+        const res = await tryApiCall(url);
         return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
       } catch (deleteErr) {
-        // If /delete fails, try the /remove endpoint
         try {
-          const res = await axios.get(`${simsim}/remove?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
+          // Then try the /remove endpoint with both parameters and user identification
+          const url = `${simsim}/remove?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderID=${uid}&senderName=${encodeURIComponent(senderName)}&isAdmin=${isAdmin}`;
+          const res = await tryApiCall(url);
           return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
         } catch (removeErr) {
-          // Try with just the ask parameter as a last resort
           try {
-            const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}`);
+            // Try with just the ask parameter and user identification
+            const url = `${simsim}/delete?ask=${encodeURIComponent(ask)}&senderID=${uid}&senderName=${encodeURIComponent(senderName)}&isAdmin=${isAdmin}`;
+            const res = await tryApiCall(url);
             return api.sendMessage(`${res.data.message || "✅ Teaching removed successfully!"}`, event.threadID, event.messageID);
           } catch (finalErr) {
             console.error("Error removing teaching:", finalErr);
-            return api.sendMessage("❌ | Failed to remove teaching. The API might be down or the question doesn't exist.", event.threadID, event.messageID);
+            // Provide more detailed error message to help troubleshoot
+            // Log the exact parameters being used for debugging
+            console.log(`Debug - Attempting to remove teaching:\nQuestion: "${ask}"\nAnswer: "${ans}"\nUser ID: ${uid}\nUser Name: ${senderName}\nisAdmin: ${isAdmin}`);
+            
+            let errorMsg = "❌ | Answer not found under this question! The teaching might not exist or the API server might be down.";
+            errorMsg += "\n\nMake sure:\n- You're using the exact format: teach remove [Question] - [Reply]";
+            errorMsg += "\n- The question and answer match exactly what was taught (case sensitive)";
+            errorMsg += "\n- There are no extra spaces before or after the question/answer";
+            
+            // Different message for admins vs regular users
+            if (permssion >= 1) {
+              errorMsg += "\n- As an admin, you can remove any teaching, but the teaching must exist";
+            } else {
+              errorMsg += "\n- You can only remove your own teachings";
+            }
+            
+            // Add the attempted parameters to the error message for clarity
+            errorMsg += `\n\nAttempted to remove:\nQuestion: "${ask}"\nAnswer: "${ans}"`
+            
+            // If there's a specific error message from the API, include it
+            if (finalErr.response && finalErr.response.data && finalErr.response.data.message) {
+              errorMsg += `\n\nAPI Error: ${finalErr.response.data.message}`;
+            }
+            
+            return api.sendMessage(errorMsg, event.threadID, event.messageID);
           }
         }
       }
