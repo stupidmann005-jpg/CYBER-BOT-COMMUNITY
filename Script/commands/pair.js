@@ -82,8 +82,8 @@ async function makeImage({ one, two }) {
   const imgTwo = await prepareAvatar(avatarTwo);
 
   pair_bg
-    .composite(imgOne, 205, 180)  // left avatar
-    .composite(imgTwo, 700, 180); // right avatar
+    .composite(imgOne, 190, 180)  // left avatar
+    .composite(imgTwo, 750, 180); // right avatar
 
   await pair_bg.writeAsync(outPath);
 
