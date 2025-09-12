@@ -11,7 +11,34 @@ module.exports.config = {
     description: "View current auction or start a new one",
     commandCategory: "economy",
     usages: "",
-    cooldowns: 10
+    cooldowns: 10,
+    dependencies: {
+        "fs-extra": "",
+        "path": "",
+        "axios": "",
+        "uuid": ""
+    }
+};
+
+// Add onLoad function to initialize the auction when the bot starts
+module.exports.onLoad = async function() {
+    try {
+        console.log('Auction command loaded successfully');
+        // Initialize global auction state if not already initialized
+        if (!global.globalAuction) {
+            global.globalAuction = {
+                isActive: false,
+                currentItem: null,
+                startTime: null,
+                endTime: null,
+                highestBid: 0,
+                highestBidder: null,
+                bids: []
+            };
+        }
+    } catch (error) {
+        console.error('Error initializing auction command:', error);
+    }
 };
 
 // Sample auction items
@@ -19,7 +46,7 @@ const sampleItems = [
     {
         name: "Rare Diamond Ring",
         description: "A stunning diamond ring with exceptional clarity",
-        imageURL: "https://i.postimg.cc/wx5KbtLD/unique-diamond-ring-shield-shaped-diamond.jpg",
+        imageURL: "https://cdn.shopify.com/s/files/1/0536/3086/1474/files/Lozenge_Diamond_480x480.jpg?v=1685329997",
         minimumBid: 1000
     },
     {
@@ -302,6 +329,8 @@ module.exports.endAuction = async function(api, specificThreadID = null) {
 
 module.exports.run = async function({ api, event }) {
     const { threadID, messageID } = event;
+    
+    console.log('Auction command executed');
     
     if (!global.globalAuction || !global.globalAuction.isActive) {
         return api.sendMessage(
