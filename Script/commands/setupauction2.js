@@ -48,6 +48,13 @@ module.exports = {
                         type: DataTypes.BIGINT,
                         defaultValue: 100
                     },
+                    currentBid: {
+                        type: DataTypes.BIGINT,
+                        defaultValue: 0
+                    },
+                    currentBidder: {
+                        type: DataTypes.STRING
+                    },
                     ownerID: {
                         type: DataTypes.STRING,
                         defaultValue: null
@@ -59,6 +66,12 @@ module.exports = {
                     enabled: {
                         type: DataTypes.BOOLEAN,
                         defaultValue: true
+                    },
+                    auctionStartTime: {
+                        type: DataTypes.DATE
+                    },
+                    auctionEndTime: {
+                        type: DataTypes.DATE
                     }
                 });
 
@@ -87,9 +100,39 @@ module.exports = {
                     }
                 });
 
+                // Define AuctionQueue model for persistent queue
+                const AuctionQueue = sequelize.define('AuctionQueue', {
+                    id: {
+                        type: DataTypes.INTEGER,
+                        primaryKey: true,
+                        autoIncrement: true
+                    },
+                    itemId: {
+                        type: DataTypes.INTEGER,
+                        allowNull: false
+                    },
+                    position: {
+                        type: DataTypes.INTEGER,
+                        allowNull: false
+                    }
+                });
+
+                // Define EnabledThreads model for persistent thread settings
+                const EnabledThreads = sequelize.define('EnabledThreads', {
+                    threadID: {
+                        type: DataTypes.STRING,
+                        primaryKey: true
+                    },
+                    enabled: {
+                        type: DataTypes.BOOLEAN,
+                        defaultValue: true
+                    }
+                });
+
                 // Set up relationships
                 AuctionBids.belongsTo(AuctionItems, { foreignKey: 'itemId' });
                 AuctionItems.hasMany(AuctionBids, { foreignKey: 'itemId' });
+                AuctionQueue.belongsTo(AuctionItems, { foreignKey: 'itemId' });
 
                 // Sync the models with the database
                 await sequelize.sync();
