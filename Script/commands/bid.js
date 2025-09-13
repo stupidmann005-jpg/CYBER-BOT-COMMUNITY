@@ -1,5 +1,4 @@
-const fs = require('fs-extra');
-const path = require('path');
+const { AuctionItems, AuctionBids } = require('../../includes/database/models');
 
 module.exports.config = {
     name: "bid",
@@ -9,24 +8,85 @@ module.exports.config = {
     description: "Place a bid in the current auction",
     commandCategory: "economy",
     usages: "[amount]",
-    cooldowns: 5,
-    dependencies: {
-        "fs-extra": "",
-        "path": ""
-    }
+    cooldowns: 5
 };
 
 module.exports.run = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     
-    console.log('Bid command executed');
-    
-    // Check if there's an active auction
-    if (!global.globalAuction || !global.globalAuction.isActive) {
-        return api.sendMessage(
-            "There is no active auction right now. Use '!auction' to check when the next auction will start.",
-            threadID, messageID
+    try {
+        // Check if there's an active auction
+        const activeAuction = await AuctionItems.findOne({
+            where: { status: 'active' }
+        });
+
+        if (!activeAuction) {
+            return api.sendMessage(
+                "❌ There is no active auction right now.\nUse '/auction' to check when the next auction will start.",
+                threadID
+            );
+        }
+
+        // Get bid amount from args
+        const bidAmount = parseInt(args[0]);
+        if (isNaN(bidAmount) || bidAmount <= 0) {
+            return api.sendMessage(
+                "❌ Please enter a valid bid amount.\nExample: /bid 1000",
+                threadID
+            );
+        }
+
+        // Check if bid is higher than current highest bid or minimum bid
+        const minimumBid = activeAuction.currentBid > 0 ? 
+            activeAuction.currentBid + 50 : // Minimum increment of 50
+            activeAuction.minimumBid;
+
+        if (bidAmount < minimumBid) {
+            return api.sendMessage(
+                `❌ Your bid must be at least $${minimumBid}${activeAuction.currentBid > 0 ? ' (current bid + $50)' : ''}`,
+                threadID
+            );
+        }
+
+        // Check if user has enough money
+        const userBalance = await Currencies.getData(senderID);
+        if (userBalance.money < bidAmount) {
+            return api.sendMessage(
+                "❌ You don't have enough money to place this bid!",
+                threadID
+            );
+        }
+
+        // Record the bid
+        await AuctionBids.create({
+            itemId: activeAuction.id,
+            bidderID: senderID,
+            amount: bidAmount
+        });
+
+        // Update auction with new highest bid
+        await activeAuction.update({
+            currentBid: bidAmount,
+            currentBidder: senderID
+        });
+
+        // Get bidder's name
+        const bidderName = await Users.getNameUser(senderID);
+
+        // Announce new highest bid
+        api.sendMessage(
+            `🔨 New Highest Bid! 🔨\n\n` +
+            `Item: ${activeAuction.name}\n` +
+            `Bidder: ${bidderName}\n` +
+            `Amount: $${bidAmount}`,
+            threadID
         );
+
+    } catch (error) {
+        console.error("Error in bid command:", error);
+        return api.sendMessage("❌ An error occurred while processing your bid.", threadID);
+    }
+};
     }
     
     // Get the bid amount
