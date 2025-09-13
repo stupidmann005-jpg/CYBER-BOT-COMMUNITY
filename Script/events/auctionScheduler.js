@@ -6,6 +6,7 @@ const { AuctionItems } = require("../../includes/database/models/auction");
 module.exports = {
     config: {
         name: "auctionScheduler",
+        eventType: ["message", "message_reply"],
         version: "1.0.0",
         credits: "CyberBot",
         description: "Auto announces auctions every 2 minutes",
