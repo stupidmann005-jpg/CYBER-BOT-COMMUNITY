@@ -10,12 +10,12 @@ module.exports = {
         cooldowns: 5,
     },
     run: async function ({ api, event }) {
-        const { sequelize } = global.client;
-        const { DataTypes } = require("sequelize");
+        const { sequelize, Sequelize } = require("../../includes/database");
+        const { DataTypes } = Sequelize;
 
         // Create AuctionItems table
         try {
-            await sequelize.define('AuctionItems', {
+            const AuctionItems = await sequelize.define('AuctionItems', {
                 id: {
                     type: DataTypes.INTEGER,
                     primaryKey: true,
@@ -50,7 +50,7 @@ module.exports = {
             });
 
             // Create AuctionBids table
-            await sequelize.define('AuctionBids', {
+            const AuctionBids = await sequelize.define('AuctionBids', {
                 id: {
                     type: DataTypes.INTEGER,
                     primaryKey: true,
@@ -79,7 +79,7 @@ module.exports = {
             });
 
             // Create Auctions table
-            await sequelize.define('Auctions', {
+            const Auctions = await sequelize.define('Auctions', {
                 id: {
                     type: DataTypes.INTEGER,
                     primaryKey: true,
@@ -112,7 +112,9 @@ module.exports = {
             });
 
             // Sync all tables
-            await sequelize.sync();
+            await AuctionItems.sync();
+            await AuctionBids.sync();
+            await Auctions.sync();
 
             // Create required directories
             const fs = require('fs-extra');
