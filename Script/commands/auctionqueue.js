@@ -13,6 +13,9 @@ module.exports = {
         usages: "auctionqueue",
         cooldowns: 5
     },
+    onStart: async function() {
+        // This is intentionally empty to prevent initialization message
+    },
     run: async function({ api, event }) {
         try {
             // Get all pending items
