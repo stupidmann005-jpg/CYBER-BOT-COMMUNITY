@@ -2,18 +2,21 @@ const fs = require('fs-extra');
 const path = require('path');
 const { AuctionItems } = require("../../includes/database/models/auction");
 
-module.exports = {
-    config: {
-        name: "queue",
-        version: "1.0.0",
-        hasPermssion: 0,
-        credits: "CyberBot",
-        description: "View all pending items in the auction queue",
-        commandCategory: "auction",
-        usages: "queue",
-        cooldowns: 5
-    },
-    run: async function({ api, event }) {
+module.exports.config = {
+    name: "queue",
+    version: "1.0.0",
+    hasPermssion: 0,
+    credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
+    description: "View all pending items in the auction queue",
+    commandCategory: "economy",
+    usages: "queue",
+    cooldowns: 5,
+    dependencies: {
+        "fs-extra": "",
+        "path": ""
+    }
+};
+module.exports.run = async function({ api, event }) {
         try {
             // Get all pending items
             const pendingItems = await AuctionItems.findAll({
