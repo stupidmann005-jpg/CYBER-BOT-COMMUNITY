@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const { AuctionItems } = require("../../includes/database/models/auction");
+const { sequelize } = require("../../includes/database/index");
 
 module.exports = {
   config: {
