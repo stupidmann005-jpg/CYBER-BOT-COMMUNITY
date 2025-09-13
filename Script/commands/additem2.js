@@ -141,16 +141,30 @@ module.exports = {
       const cacheDir = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction', 'images');
       await fs.ensureDir(cacheDir);
 
-      // Download and save the image
+        // Download and save the image
       try {
         const imageName = `item_${Date.now()}.jpg`;
         const imagePath = path.join(cacheDir, imageName);
         
-        // Download the image
-        const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
-        await fs.writeFile(imagePath, response.data);
-        
-        // Save to database with local path
+        // Download the image with proper headers
+        const response = await axios.get(imageURL, {
+          responseType: 'arraybuffer',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36',
+            'Accept': 'image/jpeg,image/png,image/*'
+          },
+          maxContentLength: 8000000, // 8MB max
+          timeout: 10000 // 10 seconds timeout
+        });
+
+        // Verify the content type
+        const contentType = response.headers['content-type'];
+        if (!contentType || !contentType.startsWith('image/')) {
+          throw new Error('Downloaded content is not an image');
+        }
+
+        // Save the image
+        await fs.writeFile(imagePath, Buffer.from(response.data));        // Save to database with local path
         const item = await AuctionItems.create({
           name,
           description,
@@ -183,7 +197,28 @@ module.exports = {
         );
       } catch (error) {
         console.error('Error saving image:', error);
-        return api.sendMessage('❌ Failed to save the image. Please try again.', event.threadID);
+        let errorMessage = '❌ Failed to save the image. ';
+        
+        if (error.response) {
+          // Server responded with error
+          if (error.response.status === 404) {
+            errorMessage += 'Image URL not found.';
+          } else if (error.response.status === 403) {
+            errorMessage += 'Access to image denied.';
+          } else {
+            errorMessage += `Server error: ${error.response.status}`;
+          }
+        } else if (error.code === 'ECONNABORTED') {
+          errorMessage += 'Download timed out. Try a different image.';
+        } else if (!error.response && error.request) {
+          errorMessage += 'Could not connect to image server.';
+        } else if (error.message.includes('content is not an image')) {
+          errorMessage += 'The URL does not point to a valid image.';
+        } else {
+          errorMessage += 'Please try again with a different image.';
+        }
+        
+        return api.sendMessage(errorMessage, event.threadID);
       }
     } catch (error) {
       console.error('Error adding item:', error);
