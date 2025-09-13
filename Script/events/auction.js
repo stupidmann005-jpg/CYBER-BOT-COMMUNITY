@@ -1,23 +1,34 @@
+module.exports.config = {
+    name: "auction",
+    eventType: ["log:subscribe", "log:unsubscribe", "message"],
+    version: "1.0.0",
+    credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
+    description: "Auto announces auctions",
+    dependencies: {
+        "fs-extra": "",
+        "path": "",
+        "sequelize": ""
+    }
+};
+
 const fs = require('fs-extra');
 const path = require('path');
 const { AuctionItems } = require("../../includes/database/models/auction");
 
-module.exports.config = {
-    name: "auction",
-    eventType: ["message"],
-    version: "1.0.0",
-    credits: "CyberBot",
-    description: "Auction event handler",
-    envConfig: {
-        autoUnsend: false,
-        delayPerGroup: 500
-    }
-};
-
 let lastCheckTime = 0;
 let isProcessing = false;
 
-module.exports.handleEvent = async function({ api, event }) {
+module.exports.onLoad = function () {
+    const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
+    const { join } = global.nodemodule["path"];
+
+    const auctionDir = join(__dirname, "..", "..", "includes", "cache", "auction");
+    if (!existsSync(auctionDir)) mkdirSync(auctionDir, { recursive: true });
+    
+    console.log('[ AUCTION ] Event loaded. Auction system ready.');
+}
+
+module.exports.run = async function({ api, event }) {
     const { threadID } = event;
     
     // Only check every 30 seconds to avoid spamming
