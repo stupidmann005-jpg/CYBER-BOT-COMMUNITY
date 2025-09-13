@@ -1,5 +1,4 @@
-const fs = require('fs-extra');
-const path = require('path');
+const { EnabledThreads } = require('../../includes/database/models');
 
 module.exports.config = {
     name: "enableauction",
@@ -17,17 +16,37 @@ module.exports.run = async function({ api, event, args }) {
     const { threadID, messageID } = event;
 
     try {
-        const auctionDir = path.join(__dirname, "..", "..", "includes", "cache", "auction");
-        const threadsPath = path.join(auctionDir, "auction_threads.json");
-        const configPath = path.join(auctionDir, "auction_config.json");
+        // Check if thread is already enabled
+        let threadSettings = await EnabledThreads.findOne({
+            where: { threadID: threadID }
+        });
 
-        // Ensure auction directory exists
-        await fs.ensureDir(auctionDir);
-
-        // Load or initialize threads list
-        let threads = [];
-        if (await fs.exists(threadsPath)) {
-            threads = await fs.readJson(threadsPath);
+        if (threadSettings) {
+            // Toggle enabled status
+            const newStatus = !threadSettings.enabled;
+            await threadSettings.update({ enabled: newStatus });
+            return api.sendMessage(
+                newStatus 
+                    ? '✅ Auctions have been enabled in this group!\nYou will now receive auction announcements.' 
+                    : '❌ Auctions have been disabled in this group.\nYou will no longer receive auction announcements.',
+                threadID
+            );
+        } else {
+            // Create new enabled thread entry
+            await EnabledThreads.create({
+                threadID: threadID,
+                enabled: true
+            });
+            return api.sendMessage(
+                '✅ Auctions have been enabled in this group!\nYou will now receive auction announcements.',
+                threadID
+            );
+        }
+    } catch (error) {
+        console.error('Error in enableauction command:', error);
+        return api.sendMessage('❌ An error occurred while trying to enable auctions.', threadID);
+    }
+};
         }
 
         // Load or initialize config
