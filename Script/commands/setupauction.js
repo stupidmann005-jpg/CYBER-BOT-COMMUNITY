@@ -10,111 +10,13 @@ module.exports = {
         cooldowns: 5,
     },
     run: async function ({ api, event }) {
-        const { sequelize, Sequelize } = require("../../includes/database");
-        const { DataTypes } = Sequelize;
-
-        // Create AuctionItems table
         try {
-            const AuctionItems = await sequelize.define('AuctionItems', {
-                id: {
-                    type: DataTypes.INTEGER,
-                    primaryKey: true,
-                    autoIncrement: true
-                },
-                name: {
-                    type: DataTypes.STRING,
-                    allowNull: false
-                },
-                description: {
-                    type: DataTypes.TEXT
-                },
-                imageURL: {
-                    type: DataTypes.STRING
-                },
-                minimumBid: {
-                    type: DataTypes.BIGINT,
-                    defaultValue: 100
-                },
-                ownerID: {
-                    type: DataTypes.STRING,
-                    defaultValue: null
-                },
-                isForSale: {
-                    type: DataTypes.BOOLEAN,
-                    defaultValue: false
-                },
-                salePrice: {
-                    type: DataTypes.BIGINT,
-                    defaultValue: 0
-                }
-            });
-
-            // Create AuctionBids table
-            const AuctionBids = await sequelize.define('AuctionBids', {
-                id: {
-                    type: DataTypes.INTEGER,
-                    primaryKey: true,
-                    autoIncrement: true
-                },
-                auctionId: {
-                    type: DataTypes.INTEGER,
-                    allowNull: false
-                },
-                itemId: {
-                    type: DataTypes.INTEGER,
-                    allowNull: false
-                },
-                bidderID: {
-                    type: DataTypes.STRING,
-                    allowNull: false
-                },
-                amount: {
-                    type: DataTypes.BIGINT,
-                    allowNull: false
-                },
-                timestamp: {
-                    type: DataTypes.DATE,
-                    defaultValue: DataTypes.NOW
-                }
-            });
-
-            // Create Auctions table
-            const Auctions = await sequelize.define('Auctions', {
-                id: {
-                    type: DataTypes.INTEGER,
-                    primaryKey: true,
-                    autoIncrement: true
-                },
-                currentItemId: {
-                    type: DataTypes.INTEGER,
-                    defaultValue: null
-                },
-                currentAuctionStart: {
-                    type: DataTypes.DATE,
-                    defaultValue: null
-                },
-                currentAuctionEnd: {
-                    type: DataTypes.DATE,
-                    defaultValue: null
-                },
-                highestBidAmount: {
-                    type: DataTypes.BIGINT,
-                    defaultValue: 0
-                },
-                highestBidderID: {
-                    type: DataTypes.STRING,
-                    defaultValue: null
-                },
-                status: {
-                    type: DataTypes.STRING,
-                    defaultValue: 'inactive'
-                }
-            });
-
-            // Sync all tables
+            // Import the models
+            const { AuctionItems, AuctionBids } = require("../../includes/database/models/auction");
+            
+            // Sync the models with the database
             await AuctionItems.sync();
             await AuctionBids.sync();
-            await Auctions.sync();
 
             // Create required directories
             const fs = require('fs-extra');
@@ -124,9 +26,10 @@ module.exports = {
 
             // Initialize config files
             const configs = {
-                'auction_config.json': { auctionDurationMinutes: 2 },
-                'auction_threads.json': [],
-                'auction_queue.json': []
+                'auction_config.json': { 
+                    auctionDuration: 120,  // 2 minutes
+                    timeBetweenAuctions: 300  // 5 minutes
+                }
             };
 
             for (const [file, defaultContent] of Object.entries(configs)) {
@@ -136,10 +39,24 @@ module.exports = {
                 }
             }
 
-            return api.sendMessage('✅ Auction system has been initialized successfully!', event.threadID);
+            // Send success message
+            return api.sendMessage(
+                "✅ Auction system initialized successfully!\n\n" +
+                "Available commands:\n" +
+                "- /additem - Add items to auction\n" +
+                "- /bid - Place bids on current item\n" +
+                "- /auction - View current auction\n" +
+                "- /listauctions - View all items up for auction\n\n" +
+                "The auction system will automatically start running auctions every 5 minutes.",
+                event.threadID
+            );
+
         } catch (error) {
             console.error('Setup error:', error);
-            return api.sendMessage('❌ Error initializing auction system. Check console for details.', event.threadID);
+            return api.sendMessage(
+                "❌ Error initializing auction system: " + error.message,
+                event.threadID
+            );
         }
     }
 };
