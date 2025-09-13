@@ -22,6 +22,14 @@ const AuctionItems = sequelize.define('AuctionItems', {
         type: DataTypes.BIGINT,
         defaultValue: 100
     },
+    currentBid: {
+        type: DataTypes.BIGINT,
+        defaultValue: null
+    },
+    currentBidder: {
+        type: DataTypes.STRING,
+        defaultValue: null
+    },
     ownerID: {
         type: DataTypes.STRING,
         defaultValue: null
@@ -33,6 +41,14 @@ const AuctionItems = sequelize.define('AuctionItems', {
     enabled: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+    },
+    auctionStartTime: {
+        type: DataTypes.BIGINT,
+        defaultValue: null
+    },
+    auctionEndTime: {
+        type: DataTypes.BIGINT,
+        defaultValue: null
     },
     soldPrice: {
         type: DataTypes.BIGINT,
