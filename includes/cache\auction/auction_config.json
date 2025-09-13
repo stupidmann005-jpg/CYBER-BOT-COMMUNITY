@@ -1,0 +1,7 @@
+{
+    "auctionDurationMinutes": 2,
+    "minBidIncrement": 50,
+    "enableAutoStart": true,
+    "maxActiveAuctions": 1,
+    "cooldownMinutes": 1
+}
