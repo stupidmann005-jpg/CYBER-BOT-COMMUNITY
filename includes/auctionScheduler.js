@@ -9,12 +9,11 @@ let auctionTimeout = null;
 
 // Get list of threads where auctions are enabled
 async function getEnabledThreads() {
+    const configPath = path.join(__dirname, 'cache', 'auction_threads.json');
     try {
-        const enabledThreads = await EnabledThreads.findAll({
-            where: { enabled: true },
-            attributes: ['threadID']
-        });
-        return enabledThreads.map(thread => thread.threadID);
+        if (fs.existsSync(configPath)) {
+            return await fs.readJson(configPath);
+        }
     } catch (error) {
         console.error('Error reading enabled threads:', error);
     }
@@ -38,19 +37,16 @@ async function getAuctionDuration() {
 }
 
 async function startAuction() {
-    try {
-        // Get next item from queue
-        const nextItem = await AuctionItems.findOne({
-            where: {
-                status: 'queued'
-            },
-            order: [['createdAt', 'ASC']]
-        });
+    // Load auction queue
+    const queuePath = require('path').join(__dirname, 'cache', 'auction_queue.json');
+    if (!require('fs-extra').existsSync(queuePath)) return;
+    
+    const queue = await require('fs-extra').readJson(queuePath);
+    if (!queue.length) return;
 
-        if (!nextItem) return;
-
-        // Update item status to active
-        await nextItem.update({ status: 'active' });
+    // Get next item from queue
+    const nextItemId = queue.shift();
+    await require('fs-extra').writeJson(queuePath, queue, { spaces: 2 });
 
     // Get item details
     const item = await AuctionItems.findByPk(nextItemId);
@@ -93,61 +89,31 @@ async function startAuction() {
     auctionTimeout = setTimeout(() => endAuction(auction.id), durationMinutes * 60 * 1000);
 }
 
-async function endAuction(itemId) {
-    const item = await AuctionItems.findOne({
-        where: {
-            id: itemId,
-            status: 'active'
-        }
-    });
-
-    if (!item) return;
+async function endAuction(auctionId) {
+    const auction = await Auctions.findByPk(auctionId);
+    if (!auction || auction.status !== 'active') return;
 
     // Find highest bid
     const highestBid = await AuctionBids.findOne({
-        where: { itemId: item.id },
-        order: [['amount', 'DESC']]
-    });
-
-    // Get enabled threads to notify
-    const enabledThreads = await EnabledThreads.findAll({
-        where: { enabled: true }
+        where: { auctionId },
+        order: [['amount', 'DESC']],
     });
 
     if (highestBid) {
-        // Update item status and ownership
-        await item.update({
-            status: 'ended',
-            ownerID: highestBid.bidderID
-        });
-
-        // Deduct money from winner
-        await Currencies.decreaseMoney(highestBid.bidderID, highestBid.amount);
-
-        // Get winner's name
-        const winnerName = await Users.getNameUser(highestBid.bidderID);
-
-        // Notify all enabled threads
-        const endMessage = `🔨 AUCTION ENDED!\n\n` +
-                         `Item: ${item.name}\n` +
-                         `Winner: ${winnerName}\n` +
-                         `Winning Bid: $${highestBid.amount}`;
-
-        for (const thread of enabledThreads) {
-            api.sendMessage(endMessage, thread.threadID);
-        }
+        // Transfer item ownership
+        const item = await AuctionItems.findByPk(auction.currentItemId);
+        item.ownerID = highestBid.bidderID;
+        await item.save();
+        auction.highestBidAmount = highestBid.amount;
+        auction.highestBidderID = highestBid.bidderID;
+        auction.status = 'ended';
+        await auction.save();
+        // Deduct money from winner's wallet (implement wallet logic)
+        // Notify winner
     } else {
-        // No bids - end auction
-        await item.update({ status: 'ended' });
-
-        // Notify all enabled threads
-        const endMessage = `🔨 AUCTION ENDED!\n\n` +
-                         `Item: ${item.name}\n` +
-                         `No bids were placed.`;
-
-        for (const thread of enabledThreads) {
-            api.sendMessage(endMessage, thread.threadID);
-        }
+        auction.status = 'ended';
+        await auction.save();
+        // Notify no winner
     }
 }
 
@@ -164,3 +130,4 @@ function stopScheduler() {
 }
 
 module.exports = { startScheduler, stopScheduler };
+
