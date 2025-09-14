@@ -16,6 +16,12 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const threadSetting = threadData.get(threadID) || {}
     const prefixRegex = new RegExp(`^(<@!?${senderID}>|${escapeRegex((threadSetting.hasOwnProperty("PREFIX")) ? threadSetting.PREFIX : PREFIX)})\\s*`);
     if (!prefixRegex.test(body)) return;
+
+    // Handle command aliases and migrations
+    const commandAliases = {
+        'auction': 'viewauction'  // Redirect old command to new one
+    };
+
     const adminbot = require('./../../config.json');
 //// admin -pa /////
     if(!global.data.allThreadID.includes(threadID) && !ADMINBOT.includes(senderID) && adminbot.adminPaOnly == true)
@@ -69,7 +75,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       const commandValues = commands['keys']();
       for (const cmd of commandValues) allCommandName.push(cmd)
       const checker = stringSimilarity.findBestMatch(commandName, allCommandName);
-      if (checker.bestMatch.rating >= 0.5) command = client.commands.get(checker.bestMatch.target);
+      if (checker.bestMatch.rating >= 0.5) command = commands.get(checker.bestMatch.target);
       else return api.sendMessage(global.getText("handleCommand", "commandNotExist", checker.bestMatch.target), threadID);
     }
     if (commandBanned.get(threadID) || commandBanned.get(senderID)) {
