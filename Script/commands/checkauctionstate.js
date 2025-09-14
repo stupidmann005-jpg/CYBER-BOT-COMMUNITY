@@ -1,8 +1,10 @@
 const { EnabledThreads } = require('../../includes/database/models/auctionModels');
+const fs = require('fs-extra');
+const path = require('path');
 
 module.exports = {
     config: {
-        name: "checkauctionstate",  // Changed name to avoid conflicts
+        name: "checkauctionstate",
         version: "1.0.0",
         hasPermssion: 1,  // Admin only
         credits: "CyberBot",
@@ -15,6 +17,12 @@ module.exports = {
         const { threadID } = event;
 
         try {
+            // Ensure auction cache directory exists
+            const cacheDir = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction');
+            await fs.ensureDir(cacheDir);
+
+            // Initialize thread settings in database if needed
+            await EnabledThreads.sync();
             // Check database for thread state
             const threadSettings = await EnabledThreads.findOne({
                 where: { threadID: threadID }
