@@ -31,19 +31,13 @@ module.exports.run = async function({ api, event }) {
     if (event.logMessageData.addedParticipants.some(i => i.userFbId == api.getCurrentUserID())) {
         // Removed automatic nickname setting when bot joins group
         const fs = require("fs");
-        return api.sendMessage("", event.threadID, () => api.sendMessage({body: `╭•┄┅═══❁🌺❁═══┅┄•╮\n   আসসালামু আলাইকুম-!!🖤💫\n╰•┄┅═══❁🌺❁═══┅┄•╯
+        return api.sendMessage("", event.threadID, () => api.sendMessage({body: `⚡ ����� ��� ��������� ⚡
 
-________________________
+▸ Prefix: ${global.config.PREFIX}
+▸ Commands: help, menu
 
-𝐓𝐡𝐚𝐧𝐤 𝐲𝐨𝐮 𝐬𝐨 𝐦𝐮𝐜𝐡 𝐟𝐨𝐫 𝐚dd𝐢𝐧𝐠 𝐦𝐞 𝐭𝐨 𝐲𝐨𝐮𝐫 𝐢-𝐠𝐫𝐨𝐮𝐩-🖤🤗\n\n𝐈 𝐰𝐢𝐥𝐥 𝐚𝐥𝐰𝐚𝐲𝐬 𝐬𝐞𝐫𝐯𝐞 𝐲𝐨𝐮 𝐢𝐧𝐚𝐡𝐚𝐥𝐥𝐚𝐡 🌺❤️-!!
-
-________________________\n\n𝐓𝐨 𝐯𝐢𝐞𝐰 𝐚𝐧𝐲 𝐜𝐨𝐦𝐦𝐚𝐧d
-
-${global.config.PREFIX}Help\n${global.config.PREFIX} Manu
-
-𝐁𝐎𝐓 𝐍𝐀𝐌𝐄 :𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️
-
-\n\n⋆✦⋆⎯⎯⎯⎯⎯⎯⎯⎯⎯⋆✦⋆
+✨ Type ${global.config.PREFIX}help to see all commands
+💫 Have a great time with the bot!
 `, attachment: fs.createReadStream(__dirname + "/cache/ullash.mp4")} ,threadID));
     }
     else {
@@ -87,3 +81,4 @@ ${global.config.PREFIX}Help\n${global.config.PREFIX} Manu
         } catch (e) { return console.log(e) };
     }
               }
+
