@@ -1,4 +1,6 @@
 const { EnabledThreads } = require('../../includes/database/models');
+const fs = require('fs-extra');
+const path = require('path');
 
 module.exports.config = {
     name: "enableauction",
@@ -16,6 +18,17 @@ module.exports.run = async function({ api, event, args }) {
     const { threadID, messageID } = event;
 
     try {
+        // Update both database and JSON file
+        const threadsFilePath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction', 'auction_threads.json');
+        await fs.ensureFile(threadsFilePath);
+        
+        let enabledThreads = [];
+        try {
+            enabledThreads = await fs.readJson(threadsFilePath);
+        } catch (err) {
+            enabledThreads = [];
+        }
+
         // Check if thread is already enabled
         let threadSettings = await EnabledThreads.findOne({
             where: { threadID: threadID }
@@ -25,6 +38,21 @@ module.exports.run = async function({ api, event, args }) {
             // Toggle enabled status
             const newStatus = !threadSettings.enabled;
             await threadSettings.update({ enabled: newStatus });
+            
+            // Update JSON file
+            if (newStatus) {
+                if (!enabledThreads.includes(threadID)) {
+                    enabledThreads.push(threadID);
+                }
+            } else {
+                const index = enabledThreads.indexOf(threadID);
+                if (index > -1) {
+                    enabledThreads.splice(index, 1);
+                }
+            }
+            
+            await fs.writeJson(threadsFilePath, enabledThreads, { spaces: 2 });
+
             return api.sendMessage(
                 newStatus 
                     ? '✅ Auctions have been enabled in this group!\n\n' +
@@ -33,7 +61,7 @@ module.exports.run = async function({ api, event, args }) {
                       '- Bids are placed\n' +
                       '- Auctions end\n\n' +
                       'Use these commands:\n' +
-                      '/additem - Add item to auction\n' +
+                      '/additem2 - Add item to auction\n' +
                       '/bid <amount> - Place a bid\n' +
                       '/auction - View current auction\n' +
                       '/showqueue - View pending items'
