@@ -7,6 +7,10 @@ module.exports.config = {
     commandCategory: "media",
     usages: "[Reply to a video]",
     cooldowns: 5,
+    dependencies: {
+        "axios": "",
+        "fs-extra": ""
+    }
 };
 
 module.exports.run = async function ({ api, event }) {
@@ -22,38 +26,58 @@ module.exports.run = async function ({ api, event }) {
     const axios = require("axios");
     const fs = require("fs-extra");
     const path = require("path");
-    const ffmpeg = require("fluent-ffmpeg");
 
-    const tempVideoPath = path.resolve(__dirname, `cache/${event.messageID}_video.mp4`);
-    const tempAudioPath = path.resolve(__dirname, `cache/${event.messageID}_audio.mp3`);
-
+    const tempPath = path.resolve(__dirname, 'cache');
+    if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
+    
+    const outputPath = path.resolve(tempPath, `${event.messageID}_audio.mp3`);
+    
     try {
-        // Download the video
-        const response = await axios.get(attachment.url, { responseType: "arraybuffer" });
-        fs.writeFileSync(tempVideoPath, Buffer.from(response.data, "utf-8"));
+        api.sendMessage("⏳ Converting video to audio, please wait...", event.threadID, event.messageID);
 
-        // Convert video to audio using ffmpeg
-        await new Promise((resolve, reject) => {
-            ffmpeg(tempVideoPath)
-                .toFormat("mp3")
-                .on("end", resolve)
-                .on("error", reject)
-                .save(tempAudioPath);
+        // Use a cloud conversion API
+        const formData = new URLSearchParams();
+        formData.append('url', attachment.url);
+        formData.append('format', 'mp3');
+
+        const response = await axios({
+            method: 'post',
+            url: 'https://co.wuk.sh/api/json',
+            data: JSON.stringify({
+                url: attachment.url,
+                aFormat: "mp3"
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
-        // Send the converted audio file
-        await api.sendMessage(
-            {
-                body: "✅ Here's your audio file:",
-                attachment: fs.createReadStream(tempAudioPath)
-            },
-            event.threadID,
-            event.messageID
-        );
+        if (response.data.status === "ok" && response.data.url) {
+            // Download the converted audio
+            const audioResponse = await axios({
+                method: 'get',
+                url: response.data.url,
+                responseType: 'arraybuffer'
+            });
 
-        // Clean up temporary files
-        fs.unlinkSync(tempVideoPath);
-        fs.unlinkSync(tempAudioPath);
+            fs.writeFileSync(outputPath, Buffer.from(audioResponse.data));
+
+            // Send the converted audio file
+            await api.sendMessage(
+                {
+                    body: "✅ Here's your audio file:",
+                    attachment: fs.createReadStream(outputPath)
+                },
+                event.threadID,
+                event.messageID
+            );
+
+            // Clean up
+            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+
+        } else {
+            throw new Error("Conversion failed");
+        }
 
     } catch (error) {
         console.error(error);
