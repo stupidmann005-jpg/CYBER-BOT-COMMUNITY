@@ -16,10 +16,14 @@ module.exports.config = {
     }
 };
 
+const { AuctionError, AuctionManager } = require('../../includes/utils/auctionManager');
+
 module.exports.run = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
+    const auctionManager = new AuctionManager(api);
     
-    console.log('Bid command executed');
+    try {
+        console.log('Bid command executed');
     
     // Check if there's an active auction
     if (!global.globalAuction || !global.globalAuction.isActive) {
@@ -38,25 +42,115 @@ module.exports.run = async function({ api, event, args, Users, Currencies }) {
         );
     }
     
-    // Check if the bid is higher than the current highest bid
-    if (bidAmount <= global.globalAuction.highestBid) {
+    // Load auction config
+    const configPath = path.join(__dirname, '..', '..', 'includes', 'cache', 'auction_config.json');
+    const config = await fs.readJson(configPath);
+    
+    const currentBid = global.globalAuction.highestBid;
+    const minIncrement = config.minBidIncrement || 50;
+    const minimumBid = currentBid ? currentBid + minIncrement : global.globalAuction.minimumBid;
+    
+    // Validate bid amount
+    if (bidAmount < minimumBid) {
         return api.sendMessage(
-            `Your bid must be higher than the current highest bid of $${global.globalAuction.highestBid}.`,
+            `Your bid must be at least $${minimumBid} (current bid: $${currentBid || 0}, minimum increment: $${minIncrement}).`,
+            threadID, messageID
+        );
+    }
+    
+    // Check if the auction is still accepting bids
+    const currentTime = Date.now();
+    if (currentTime >= global.globalAuction.endTime) {
+        throw new AuctionError(
+            "This auction has already ended",
+            'AUCTION_ENDED',
+            { endTime: global.globalAuction.endTime }
+        );
+    }
+    
+    // Prevent self-bidding if user is current highest bidder
+    if (global.globalAuction.highestBidder === senderID) {
+        return api.sendMessage(
+            "You already have the highest bid in this auction!",
             threadID, messageID
         );
     }
     
     try {
-        // Check if the user has enough money
-        const userMoney = await Currencies.getData(senderID);
-        const userBalance = userMoney.money || 0;
+        // Start a transaction for bid placement
+        const transaction = await sequelize.transaction();
         
-        if (userBalance < bidAmount) {
-            return api.sendMessage(
-                `You don't have enough money to place this bid. Your balance: $${userBalance}`,
-                threadID, messageID
+        try {
+            // Check if the user has enough money
+            const userMoney = await Currencies.findOne({
+                where: { userID: senderID },
+                lock: true,
+                transaction
+            });
+            
+            const userBalance = userMoney ? userMoney.money : 0;
+            if (userBalance < bidAmount) {
+                await transaction.rollback();
+                return api.sendMessage(
+                    `You don't have enough money to place this bid. Your balance: $${userBalance}`,
+                    threadID, messageID
+                );
+            }
+
+            // Hold the bid amount
+            await Currencies.update(
+                { money: userBalance - bidAmount },
+                { 
+                    where: { userID: senderID },
+                    transaction
+                }
             );
+
+            // Record the held amount
+            await AuctionHolds.create({
+                userID: senderID,
+                amount: bidAmount,
+                auctionID: global.globalAuction.id,
+                expiresAt: global.globalAuction.endTime
+            }, { transaction });
+
+            // If there was a previous bid, return that person's money
+            if (global.globalAuction.highestBidder) {
+                const previousBid = global.globalAuction.highestBid;
+                await Currencies.increment(
+                    'money',
+                    {
+                        by: previousBid,
+                        where: { userID: global.globalAuction.highestBidder },
+                        transaction
+                    }
+                );
+                
+                // Delete the previous hold
+                await AuctionHolds.destroy({
+                    where: {
+                        userID: global.globalAuction.highestBidder,
+                        auctionID: global.globalAuction.id
+                    },
+                    transaction
+                });
+            }
+
+            await transaction.commit();
+        } catch (error) {
+            await transaction.rollback();
+            throw new AuctionError('Failed to process bid transaction', 'TRANSACTION_FAILED', {
+                bidAmount,
+                userId: senderID
+            });
         }
+    } catch (error) {
+        await auctionManager.handleError(error, threadID, {
+            command: 'bid',
+            userId: senderID,
+            bidAmount
+        });
+    }
         
         // Get user's name
         const userData = await Users.getData(senderID);
@@ -73,6 +167,20 @@ module.exports.run = async function({ api, event, args, Users, Currencies }) {
             amount: bidAmount,
             time: new Date()
         });
+
+        // Extend auction time if bid is placed near the end
+        const settings = await getAuctionSettings();
+        const timeLeft = global.globalAuction.endTime - new Date();
+        if (timeLeft < settings.extendTimeOnBidMinutes * 60 * 1000) {
+            const newEndTime = new Date(Date.now() + settings.extendTimeOnBidMinutes * 60 * 1000);
+            if (newEndTime - global.globalAuction.startTime <= settings.maximumAuctionDuration * 60 * 1000) {
+                global.globalAuction.endTime = newEndTime;
+                await api.sendMessage(
+                    `⏰ Auction extended by ${settings.extendTimeOnBidMinutes} minutes due to last-minute bid!`,
+                    threadID
+                );
+            }
+        }
         
         // Calculate time remaining
         const now = new Date();
