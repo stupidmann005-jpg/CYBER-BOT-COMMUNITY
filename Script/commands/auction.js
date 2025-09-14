@@ -1,4 +1,4 @@
-const { AuctionItems, EnabledThreads } = require('../../includes/database/models');
+const { AuctionItems, EnabledThreads } = require('../../includes/database/models/auctionModels');
 
 module.exports = {
     config: {
