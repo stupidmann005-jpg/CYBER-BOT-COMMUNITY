@@ -48,6 +48,56 @@ module.exports.run = async function({ api, event, args, Users, Currencies }) {
         const bidAmount = parseInt(args[0]);
         if (isNaN(bidAmount) || bidAmount <= 0) {
             return api.sendMessage(
+                "❌ Please provide a valid bid amount.\n" +
+                "Usage: /bid <amount>",
+                threadID
+            );
+        }
+
+        // Check if bid meets minimum amount
+        if (bidAmount < activeAuction.minimumBid) {
+            return api.sendMessage(
+                `❌ Your bid must be at least $${activeAuction.minimumBid}`,
+                threadID
+            );
+        }
+
+        // Check if bid is higher than current bid
+        if (bidAmount <= (activeAuction.currentBid || activeAuction.minimumBid)) {
+            return api.sendMessage(
+                `❌ Your bid must be higher than the current bid of $${activeAuction.currentBid || activeAuction.minimumBid}`,
+                threadID
+            );
+        }
+
+        // Check user's balance
+        const userBalance = await Currencies.getData(senderID);
+        if (!userBalance || userBalance.money < bidAmount) {
+            return api.sendMessage(
+                "❌ You don't have enough money to place this bid!",
+                threadID
+            );
+        }
+
+        // Place the bid
+        await AuctionBids.create({
+            auctionId: activeAuction.id,
+            itemId: activeAuction.id,
+            bidderID: senderID,
+            amount: bidAmount
+        });
+
+        // Update item's current bid
+        await activeAuction.update({
+            currentBid: bidAmount,
+            currentBidderID: senderID
+        });
+
+        // Get bidder's name
+        const bidderName = await Users.getNameUser(senderID);
+
+        // Announce the new bid
+        return api.sendMessage(
                 "❌ Please enter a valid bid amount.\n" +
                 "Example: /bid 1000",
                 threadID
