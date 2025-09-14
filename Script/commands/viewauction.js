@@ -26,11 +26,15 @@ module.exports = {
 
             if (!activeItem) {
                 return api.sendMessage(
-                    "📢 No auction is currently running.\n\n" +
-                    "💡 Admin commands:\n" +
-                    "• /additem2 - Add an item to auction\n" +
-                    "• /enableauction - Enable auctions in this chat\n" +
-                    "• /disableauction - Disable auctions in this chat",
+                    "📢 [AUCTION STATUS]\n\n" +
+                    "❌ No active auction is currently running.\n\n" +
+                    "Available Commands:\n" +
+                    "• /viewauction - View current auction\n" +
+                    "• /bid <amount> - Place a bid\n\n" +
+                    "Admin Commands:\n" +
+                    "• /additem2 - Add item to auction\n" +
+                    "• /enableauction - Enable auctions\n" +
+                    "• /disableauction - Disable auctions",
                     threadID
                 );
             }
