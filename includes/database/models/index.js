@@ -107,9 +107,16 @@ AuctionQueue.belongsTo(AuctionItems, { foreignKey: 'itemId' });
 // Create tables if they don't exist
 sequelize.sync();
 
+const AuctionHolds = require('./auctionHolds');
+
+// Set up additional relationships
+AuctionHolds.belongsTo(AuctionItems, { foreignKey: 'auctionID' });
+AuctionItems.hasMany(AuctionHolds, { foreignKey: 'auctionID' });
+
 module.exports = {
     AuctionItems,
     AuctionBids,
     AuctionQueue,
-    EnabledThreads
+    EnabledThreads,
+    AuctionHolds
 };
