@@ -57,6 +57,12 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     if (args.length === 0 || args[0] === '') return;
     
     commandName = args.shift().toLowerCase();
+    
+    // Check for command aliases
+    if (commandAliases[commandName]) {
+        commandName = commandAliases[commandName];
+    }
+    
     var command = commands.get(commandName);
     if (!command) {
       var allCommandName = [];
