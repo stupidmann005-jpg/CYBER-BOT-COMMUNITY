@@ -40,8 +40,8 @@ module.exports.run = async function ({ api, event }) {
     try {
         api.sendMessage("⏳ Converting video to audio, please wait...", event.threadID, event.messageID);
 
-        // Download the video first
-        const videoResponse = await axios({
+        // Direct download and save as MP3
+        const response = await axios({
             method: 'get',
             url: attachment.url,
             responseType: 'arraybuffer',
@@ -50,32 +50,35 @@ module.exports.run = async function ({ api, event }) {
             }
         });
 
-        // Now use the y2mate API for conversion
-        const formData = new URLSearchParams();
-        formData.append('url', attachment.url);
-        formData.append('q_auto', '0');
-        formData.append('ajax', '1');
+        // Save directly as MP3
+        fs.writeFileSync(outputPath, Buffer.from(response.data));
 
-        const response = await axios({
-            method: 'post',
-            url: 'https://www.y2mate.com/mates/analyzeV2/ajax',
-            data: formData,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
+        // Send the audio file
+        await api.sendMessage(
+            {
+                body: "✅ Here's your audio file:",
+                attachment: fs.createReadStream(outputPath)
+            },
+            event.threadID,
+            event.messageID
+        );
 
-        if (response.data && response.data.dlink) {
+        // Clean up
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+
+        if (response.data && response.data.audio_url) {
             // Download the converted audio
             const audioResponse = await axios({
                 method: 'get',
-                url: response.data.dlink,
+                url: response.data.audio_url,
                 responseType: 'arraybuffer',
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
                 }
             });
+
+            // Clean up video file
+            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
 
             fs.writeFileSync(outputPath, Buffer.from(audioResponse.data));
 
