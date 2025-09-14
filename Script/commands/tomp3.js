@@ -23,6 +23,11 @@ module.exports.run = async function ({ api, event }) {
         return api.sendMessage("❌ Please reply to a video message, not other types of attachments.", event.threadID, event.messageID);
     }
 
+    // Check file size (100MB limit)
+    if (attachment.size > 100 * 1024 * 1024) {
+        return api.sendMessage("❌ Video file is too large. Please use a video smaller than 100MB.", event.threadID, event.messageID);
+    }
+
     const axios = require("axios");
     const fs = require("fs-extra");
     const path = require("path");
@@ -35,29 +40,41 @@ module.exports.run = async function ({ api, event }) {
     try {
         api.sendMessage("⏳ Converting video to audio, please wait...", event.threadID, event.messageID);
 
-        // Use a cloud conversion API
-        const formData = new URLSearchParams();
-        formData.append('url', attachment.url);
-        formData.append('format', 'mp3');
-
-        const response = await axios({
-            method: 'post',
-            url: 'https://co.wuk.sh/api/json',
-            data: JSON.stringify({
-                url: attachment.url,
-                aFormat: "mp3"
-            }),
+        // Download the video first
+        const videoResponse = await axios({
+            method: 'get',
+            url: attachment.url,
+            responseType: 'arraybuffer',
             headers: {
-                'Content-Type': 'application/json'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
             }
         });
 
-        if (response.data.status === "ok" && response.data.url) {
+        // Now use the y2mate API for conversion
+        const formData = new URLSearchParams();
+        formData.append('url', attachment.url);
+        formData.append('q_auto', '0');
+        formData.append('ajax', '1');
+
+        const response = await axios({
+            method: 'post',
+            url: 'https://www.y2mate.com/mates/analyzeV2/ajax',
+            data: formData,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        if (response.data && response.data.dlink) {
             // Download the converted audio
             const audioResponse = await axios({
                 method: 'get',
-                url: response.data.url,
-                responseType: 'arraybuffer'
+                url: response.data.dlink,
+                responseType: 'arraybuffer',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
+                }
             });
 
             fs.writeFileSync(outputPath, Buffer.from(audioResponse.data));
@@ -81,6 +98,22 @@ module.exports.run = async function ({ api, event }) {
 
     } catch (error) {
         console.error(error);
-        return api.sendMessage("❌ An error occurred while converting the video. Please try again later.", event.threadID, event.messageID);
+        
+        // Cleanup any partial files
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        
+        let errorMessage = "❌ An error occurred while converting the video.";
+        if (error.response) {
+            // Server responded with error
+            if (error.response.status === 429) {
+                errorMessage = "❌ Too many requests. Please try again in a few minutes.";
+            } else if (error.response.status === 413) {
+                errorMessage = "❌ Video file is too large to convert.";
+            }
+        } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+            errorMessage = "❌ Connection error. Please check your internet connection and try again.";
+        }
+        
+        return api.sendMessage(errorMessage, event.threadID, event.messageID);
     }
 };
