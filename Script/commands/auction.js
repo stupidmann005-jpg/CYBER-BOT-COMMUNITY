@@ -1,4 +1,4 @@
-const { AuctionItems, EnabledThreads } = require('../../includes/database/models/auctionModels');
+const { AuctionItems } = require('../../includes/database/models/auctionModels');
 
 module.exports = {
     config: {
@@ -6,27 +6,12 @@ module.exports = {
         description: 'Show current auction item',
         usage: 'auction',
         cooldown: 5,
+        hasPermssion: 0, // Everyone can use this command
     },
     run: async function({ api, event, Users }) {
         const { threadID } = event;
 
         try {
-            // Check if auctions are enabled for this thread
-            const threadEnabled = await EnabledThreads.findOne({
-                where: { 
-                    threadID: threadID,
-                    enabled: true
-                }
-            });
-
-            if (!threadEnabled) {
-                return api.sendMessage(
-                    "❌ Auctions are not enabled in this group.\n" +
-                    "An admin must use '/enableauction' first.",
-                    threadID
-                );
-            }
-
             // Find active auction
             const activeItem = await AuctionItems.findOne({ 
                 where: { status: 'active' }
@@ -45,26 +30,54 @@ module.exports = {
             const minutesLeft = Math.max(0, Math.floor(timeLeft / 60000));
             const secondsLeft = Math.max(0, Math.floor((timeLeft % 60000) / 1000));
 
-            let msg = `� Current Auction 🔨\n\n`;
+            let msg = `🔨 Current Auction 🔨\n\n`;
             msg += `Item: ${activeItem.name}\n`;
             msg += `Description: ${activeItem.description}\n`;
             msg += `Current Bid: $${activeItem.currentBid || activeItem.minimumBid}\n`;
+            
+            // Safely get bidder name
             if (activeItem.currentBidder) {
-                const bidderName = await Users.getNameUser(activeItem.currentBidder);
-                msg += `Highest Bidder: ${bidderName}\n`;
+                try {
+                    const bidderName = await Users.getNameUser(activeItem.currentBidder) || "Unknown User";
+                    msg += `Highest Bidder: ${bidderName}\n`;
+                } catch (error) {
+                    console.error('Error getting bidder name:', error);
+                    msg += `Highest Bidder: User_${activeItem.currentBidder}\n`;
+                }
             }
-            msg += `Minimum Next Bid: $${(activeItem.currentBid || activeItem.minimumBid) + 50}\n`;
+            
+            const minNextBid = Math.ceil((activeItem.currentBid || activeItem.minimumBid) * 1.1); // 10% minimum increase
+            msg += `Minimum Next Bid: $${minNextBid}\n`;
             msg += `Time Remaining: ${minutesLeft}m ${secondsLeft}s\n\n`;
             msg += `Use '/bid <amount>' to place a bid!`;
 
-            if (activeItem.imageURL) {
-                // Send image with details
-                api.sendMessage({ 
-                    body: msg, 
-                    attachment: await global.utils.getStreamFromURL(activeItem.imageURL) 
-                }, threadID);
-            } else {
-                api.sendMessage(msg, threadID);
+            try {
+                if (activeItem.imageURL) {
+                    // Try to load and send image with details
+                    try {
+                        const attachment = await global.utils.getStreamFromURL(activeItem.imageURL);
+                        await api.sendMessage({ 
+                            body: msg, 
+                            attachment: attachment
+                        }, threadID);
+                    } catch (imageError) {
+                        console.error('Error loading auction image:', imageError);
+                        // If image fails, send message without it
+                        msg += '\n\n⚠️ (Image unavailable)';
+                        await api.sendMessage(msg, threadID);
+                    }
+                } else {
+                    await api.sendMessage(msg, threadID);
+                }
+            } catch (sendError) {
+                console.error('Error sending auction message:', sendError);
+                // Simplified fallback message
+                await api.sendMessage(
+                    `🔨 Auction: ${activeItem.name}\n` +
+                    `Current Bid: $${activeItem.currentBid || activeItem.minimumBid}\n` +
+                    `Time Left: ${minutesLeft}m ${secondsLeft}s`,
+                    threadID
+                );
             }
         } catch (error) {
             console.error('Error in auction command:', error);
