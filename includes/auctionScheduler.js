@@ -1,5 +1,5 @@
 // Auction Scheduler for CYBER-BOT
-const { Auctions, AuctionItems, AuctionBids, Users } = require('../includes/database/models');
+const { AuctionItems, AuctionBids, AuctionQueue, EnabledThreads } = require('./database/models/auctionModels');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs-extra');
@@ -20,20 +20,30 @@ async function getEnabledThreads() {
     return [];
 }
 
-// Default auction duration in minutes
-const DEFAULT_AUCTION_DURATION = 2;
+// Default auction settings
+const DEFAULT_SETTINGS = {
+    auctionDurationMinutes: 10,
+    minimumAuctionDuration: 5,
+    maximumAuctionDuration: 60,
+    extendTimeOnBidMinutes: 2
+};
 
-async function getAuctionDuration() {
+async function getAuctionSettings() {
     const configPath = path.join(__dirname, 'cache', 'auction_config.json');
     try {
         if (fs.existsSync(configPath)) {
             const config = await fs.readJson(configPath);
-            return config.auctionDurationMinutes || DEFAULT_AUCTION_DURATION;
+            return {
+                auctionDurationMinutes: config.auctionDurationMinutes || DEFAULT_SETTINGS.auctionDurationMinutes,
+                minimumAuctionDuration: config.minimumAuctionDuration || DEFAULT_SETTINGS.minimumAuctionDuration,
+                maximumAuctionDuration: config.maximumAuctionDuration || DEFAULT_SETTINGS.maximumAuctionDuration,
+                extendTimeOnBidMinutes: config.extendTimeOnBidMinutes || DEFAULT_SETTINGS.extendTimeOnBidMinutes
+            };
         }
     } catch (error) {
         console.error('Error reading auction config:', error);
     }
-    return DEFAULT_AUCTION_DURATION;
+    return DEFAULT_SETTINGS;
 }
 
 async function startAuction() {
@@ -100,16 +110,69 @@ async function endAuction(auctionId) {
     });
 
     if (highestBid) {
-        // Transfer item ownership
-        const item = await AuctionItems.findByPk(auction.currentItemId);
-        item.ownerID = highestBid.bidderID;
-        await item.save();
-        auction.highestBidAmount = highestBid.amount;
-        auction.highestBidderID = highestBid.bidderID;
-        auction.status = 'ended';
-        await auction.save();
-        // Deduct money from winner's wallet (implement wallet logic)
-        // Notify winner
+        try {
+            // Start transaction
+            await sequelize.transaction(async (t) => {
+                // Get the item and previous owner
+                const item = await AuctionItems.findByPk(auction.currentItemId, { transaction: t });
+                const previousOwnerID = item.ownerID;
+                
+                // Transfer item ownership
+                item.ownerID = highestBid.bidderID;
+                await item.save({ transaction: t });
+                
+                // Update auction status
+                auction.highestBidAmount = highestBid.amount;
+                auction.highestBidderID = highestBid.bidderID;
+                auction.status = 'ended';
+                await auction.save({ transaction: t });
+                
+                // Handle payments
+                if (previousOwnerID) {
+                    // Pay the previous owner
+                    await Users.increment('money', {
+                        by: highestBid.amount,
+                        where: { id: previousOwnerID },
+                        transaction: t
+                    });
+                }
+                
+                // Deduct money from winner (they should have already had it held when bidding)
+                await Users.decrement('money', {
+                    by: highestBid.amount,
+                    where: { id: highestBid.bidderID },
+                    transaction: t
+                });
+                
+                // Create transaction record
+                await AuctionTransactions.create({
+                    itemId: item.id,
+                    sellerId: previousOwnerID,
+                    buyerId: highestBid.bidderID,
+                    amount: highestBid.amount,
+                    type: 'auction_sale'
+                }, { transaction: t });
+            });
+            
+            // Send success notifications
+            const winner = await Users.findByPk(highestBid.bidderID);
+            const winnerMsg = `🎉 Congratulations! You won the auction!\n` +
+                            `Item: ${item.name}\n` +
+                            `Final Price: $${highestBid.amount}`;
+            await api.sendMessage(winnerMsg, winner.threadID);
+            
+            if (previousOwnerID) {
+                const seller = await Users.findByPk(previousOwnerID);
+                const sellerMsg = `💰 Your item "${item.name}" has been sold!\n` +
+                                `Sale Price: $${highestBid.amount}`;
+                await api.sendMessage(sellerMsg, seller.threadID);
+            }
+        } catch (error) {
+            console.error('Error processing auction end:', error);
+            // Handle failed transaction
+            auction.status = 'error';
+            await auction.save();
+        }
     } else {
         auction.status = 'ended';
         await auction.save();
