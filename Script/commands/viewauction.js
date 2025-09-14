@@ -1,8 +1,10 @@
 const { AuctionItems } = require('../../includes/database/models/auctionModels');
+const fs = require('fs-extra');
+const path = require('path');
 
 module.exports = {
     config: {
-        name: "viewauction",  // Changed name to avoid conflicts
+        name: "viewauction",
         version: "1.0.0",
         hasPermssion: 0,
         credits: "CyberBot",
@@ -15,6 +17,8 @@ module.exports = {
         const { threadID } = event;
 
         try {
+            // Ensure models are synchronized
+            await AuctionItems.sync();
             // Just find active auction
             const activeItem = await AuctionItems.findOne({
                 where: { status: 'active' }
