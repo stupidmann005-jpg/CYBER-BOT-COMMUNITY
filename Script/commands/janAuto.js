@@ -21,6 +21,9 @@ module.exports = {
     usages: "",
     cooldowns: 0
   },
+  languages: {
+    en: {}
+  },
   run: async function () {},
   handleEvent: async function ({ api, event }) {
     try {
@@ -46,5 +49,4 @@ module.exports = {
     }
   }
 };
-
 
