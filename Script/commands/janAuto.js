@@ -27,17 +27,19 @@ module.exports = {
   run: async function () {},
   handleEvent: async function ({ api, event }) {
     try {
+      // Only react when user replies to THIS bot's message
+      if (event.type !== "message_reply" || !event.messageReply) return;
+      const botId = String(api.getCurrentUserID());
+      if (String(event.messageReply.senderID) !== botId) return;
+
       const body = (event.body || "").trim();
       if (!body) return;
-
-      // ignore if it's likely a command (starts with prefix-like chars)
-      if (/^[!./#?$%~^&*]/.test(body)) return;
 
       const base = await getJanApiBase();
       if (!base) return;
 
       // Query Jan API for a reply to the user's message
-      const response = await axios.get(`${base}/msg`, { params: { userMessage: body } });
+      const response = await axios.get(`${base}/msg`, { params: { userMessage: body.toLowerCase() } });
       const result = response.data && (response.data.result || response.data.message);
 
       if (result) {
@@ -49,4 +51,5 @@ module.exports = {
     }
   }
 };
+
 
