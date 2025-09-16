@@ -6,6 +6,18 @@ const getJanBase = async () => {
   return base.data.mahmud + "/api/jan";
 };
 
+// Convert plain text to bold math letters/numbers
+function toBold(text) {
+  const mapChar = (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1D400 + (code - 65));
+    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1D41A + (code - 97));
+    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1D7CE + (code - 48));
+    return ch;
+  };
+  return String(text).split("").map(mapChar).join("");
+}
+
 module.exports.config = {
   name: "teach",
   version: "2.0.0",
@@ -27,7 +39,7 @@ module.exports.run = async function({ api, event, args, Users }) {
       return api.sendMessage("❌ | Use:\n- teach [trigger] - [response1, response2,...]\n- teach remove [trigger] - [index]\n- teach list | teach list all\n- teach msg [trigger]", event.threadID, event.messageID);
     }
     const base = await getJanBase();
-
+    
     // remove flow (Jan: trigger + index)
     if (args[0].toLowerCase() === "remove") {
       const removeText = args.slice(1).join(" ");
@@ -76,11 +88,15 @@ module.exports.run = async function({ api, event, args, Users }) {
       const searchTrigger = args.slice(1).join(" ");
       if (!searchTrigger) return api.sendMessage("❌ Provide a message to search.", event.threadID, event.messageID);
       try {
-        const res = await axios.get(`${base}/msg`, { params: { userMessage: `msg ${searchTrigger}` } });
-        if (res.data?.message) return api.sendMessage(res.data.message, event.threadID, event.messageID);
+        const res = await axios.get(`${base}/msg`, { params: { userMessage: searchTrigger.toLowerCase() } });
+        if (res.data?.message || res.data?.result) {
+          const text = res.data.message || res.data.result;
+          return api.sendMessage(toBold(text), event.threadID, event.messageID);
+        }
         return api.sendMessage("Not found.", event.threadID, event.messageID);
       } catch (err) {
-        return api.sendMessage(err.response?.data?.error || err.message, event.threadID, event.messageID);
+        const e = err.response?.data?.error || err.response?.data?.message || err.message;
+        return api.sendMessage(e, event.threadID, event.messageID);
       }
     }
 
@@ -98,7 +114,8 @@ module.exports.run = async function({ api, event, args, Users }) {
       const res = await axios.post(`${base}/teach`, { trigger, responses, userID: uid });
       return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${res.data.count || 0}`, event.threadID, event.messageID);
     } catch (err) {
-      return api.sendMessage(err.response?.data || err.message, event.threadID, event.messageID);
+      const e = err.response?.data?.error || err.response?.data?.message || err.message;
+      return api.sendMessage(e, event.threadID, event.messageID);
     }
   } catch (err) {
     console.error(err);
