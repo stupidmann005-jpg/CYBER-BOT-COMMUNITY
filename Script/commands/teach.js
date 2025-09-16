@@ -20,42 +20,59 @@ function toBold(text) {
 
 // Helpers with endpoint fallbacks to avoid 404 on different deployments
 async function getMsgWithFallback(base, userMessage) {
-  const candidates = [
+  const urls = [
     `${base}/msg`,
     `${base}/message`,
     `${base}/get`
   ];
+  const paramKeys = ["userMessage", "message", "text", "ask", "q"];
+  const attempts = [];
   let lastErr = null;
-  for (const url of candidates) {
-    try {
-      const res = await axios.get(url, { params: { userMessage } });
-      return res;
-    } catch (e) {
-      lastErr = e;
-      if (e.response && e.response.status !== 404) break;
+  for (const url of urls) {
+    for (const key of paramKeys) {
+      try {
+        const res = await axios.get(url, { params: { [key]: userMessage } });
+        return res;
+      } catch (e) {
+        lastErr = e;
+        attempts.push(`${url}?${key}=... -> ${e.response?.status || e.code || e.message}`);
+        if (e.response && e.response.status !== 404 && e.response.status !== 400) {
+          // break early on non-notfound errors
+          break;
+        }
+      }
     }
   }
-  throw lastErr || new Error("Unable to reach Jan msg endpoint");
+  const err = new Error(`Unable to reach Jan msg endpoint. Attempts: \n- ${attempts.join("\n- ")}`);
+  err.cause = lastErr;
+  throw err;
 }
 
 async function removeWithFallback(base, trigger, index) {
+  const attempts = [];
   // Try DELETE with body
   try {
     return await axios.delete(`${base}/remove`, { data: { trigger, index } });
   } catch (e1) {
+    attempts.push(`DELETE /remove body -> ${e1.response?.status || e1.code || e1.message}`);
     // If route not found or method not allowed, try POST /remove
     if (e1.response && (e1.response.status === 404 || e1.response.status === 405)) {
       try {
         return await axios.post(`${base}/remove`, { trigger, index });
       } catch (e2) {
+        attempts.push(`POST /remove body -> ${e2.response?.status || e2.code || e2.message}`);
         // Try GET with query params as last resort
         if (e2.response && (e2.response.status === 404 || e2.response.status === 405)) {
           return await axios.get(`${base}/remove`, { params: { trigger, index } });
         }
-        throw e2;
+        const err = new Error(`Remove failed. Attempts: \n- ${attempts.join("\n- ")}`);
+        err.cause = e2;
+        throw err;
       }
     }
-    throw e1;
+    const err = new Error(`Remove failed. Attempts: \n- ${attempts.join("\n- ")}`);
+    err.cause = e1;
+    throw err;
   }
 }
 
