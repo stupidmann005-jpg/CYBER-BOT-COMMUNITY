@@ -1,4 +1,5 @@
 const axios = require("axios");
+const path = require("path");
 
 // Resolve MahMUD Jan base API dynamically
 const getJanBase = async () => {
@@ -125,6 +126,57 @@ async function listWithFallback(base, listAll) {
   throw err;
 }
 
+// ———————————————————— LOCAL MAHMUD DB FALLBACK ———————————————————— //
+let _teachingsDataPromise = null;
+async function getTeachingsData() {
+  if (_teachingsDataPromise) return _teachingsDataPromise;
+  try {
+    const connectDBPath = path.join(__dirname, "..", "..", "..", "MahMUD-goatbot-v2-main", "dashboard", "connectDB.js");
+    const connect = require(connectDBPath);
+    _teachingsDataPromise = connect().then(db => db.teachingsData);
+    return _teachingsDataPromise;
+  } catch (e) {
+    throw new Error("Mahmud DB not available locally: " + (e.message || e));
+  }
+}
+
+async function localTeachCreate(trigger, responses, userID) {
+  const teachingsData = await getTeachingsData();
+  const res = await teachingsData.create(trigger, responses, userID);
+  // emulate count by counting all entries for this trigger
+  const list = await teachingsData.getByTrigger(trigger.toLowerCase());
+  return { message: "OK", count: Array.isArray(list) ? list.length : 1 };
+}
+
+async function localTeachRemove(trigger, index) {
+  const teachingsData = await getTeachingsData();
+  await teachingsData.removeByIndex(trigger, index);
+  return { message: "Removed" };
+}
+
+async function localTeachList(all) {
+  const teachingsData = await getTeachingsData();
+  const allData = await teachingsData.getAll();
+  if (all) {
+    const counts = {};
+    for (const t of allData) {
+      counts[t.userID] = (counts[t.userID] || 0) + 1;
+    }
+    return { data: counts };
+  }
+  return { message: `Total teaches: ${allData.length}` };
+}
+
+async function localTeachMsg(userMessage) {
+  const teachingsData = await getTeachingsData();
+  const list = await teachingsData.getByTrigger(String(userMessage).toLowerCase());
+  if (!list || list.length === 0) return { message: null, result: null };
+  const item = list[Math.floor(Math.random() * list.length)];
+  const responses = Array.isArray(item.responses) ? item.responses : [item.responses];
+  const result = responses[Math.floor(Math.random() * responses.length)];
+  return { message: result, result };
+}
+
 module.exports.config = {
   name: "teach",
   version: "2.0.0",
@@ -163,8 +215,13 @@ module.exports.run = async function({ api, event, args, Users }) {
         const res = await removeWithFallback(base, trigger, index);
         return api.sendMessage(`${res.data?.message || "✅ Removed"}`, event.threadID, event.messageID);
       } catch (err) {
-        const e = err.response?.data?.error || err.response?.data?.message || err.message;
-        return api.sendMessage(e, event.threadID, event.messageID);
+        try {
+          const local = await localTeachRemove(trigger, index);
+          return api.sendMessage(`${local.message ? "✅ " + local.message : "✅ Removed"}`, event.threadID, event.messageID);
+        } catch (e2) {
+          const e = err.response?.data?.error || err.response?.data?.message || err.message;
+          return api.sendMessage(e, event.threadID, event.messageID);
+        }
       }
     }
 
@@ -187,8 +244,25 @@ module.exports.run = async function({ api, event, args, Users }) {
         }
         return api.sendMessage(res.data?.message || "📚 No data.", event.threadID, event.messageID);
       } catch (err) {
-        const e = err.response?.data?.error || err.response?.data?.message || err.message;
-        return api.sendMessage(e, event.threadID, event.messageID);
+        try {
+          const listAll = args[1] && args[1].toLowerCase() === "all";
+          const local = await localTeachList(listAll);
+          if (listAll) {
+            const data = local.data || {};
+            const entries = Object.entries(data);
+            if (entries.length === 0) return api.sendMessage("📚 No data.", event.threadID, event.messageID);
+            let msg = "👑 List of all teachers (counts):\n\n";
+            for (let i = 0; i < entries.length; i++) {
+              const [userID, count] = entries[i];
+              msg += `${i + 1}. ${userID}: ${count}\n`;
+            }
+            return api.sendMessage(msg, event.threadID, event.messageID);
+          }
+          return api.sendMessage(local.message || "📚 No data.", event.threadID, event.messageID);
+        } catch (e2) {
+          const e = err.response?.data?.error || err.response?.data?.message || err.message;
+          return api.sendMessage(e, event.threadID, event.messageID);
+        }
       }
     }
 
@@ -204,8 +278,17 @@ module.exports.run = async function({ api, event, args, Users }) {
         }
         return api.sendMessage("Not found.", event.threadID, event.messageID);
       } catch (err) {
-        const e = err.response?.data?.error || err.response?.data?.message || err.message;
-        return api.sendMessage(e, event.threadID, event.messageID);
+        try {
+          const local = await localTeachMsg(searchTrigger.toLowerCase());
+          if (local.message || local.result) {
+            const text = local.message || local.result;
+            return api.sendMessage(toBold(text), event.threadID, event.messageID);
+          }
+          return api.sendMessage("Not found.", event.threadID, event.messageID);
+        } catch (e2) {
+          const e = err.response?.data?.error || err.response?.data?.message || err.message;
+          return api.sendMessage(e, event.threadID, event.messageID);
+        }
       }
     }
 
@@ -223,8 +306,13 @@ module.exports.run = async function({ api, event, args, Users }) {
       const res = await postTeachWithFallback(base, trigger, responses, uid);
       return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${res.data.count || 0}`, event.threadID, event.messageID);
     } catch (err) {
-      const e = err.response?.data?.error || err.response?.data?.message || err.message;
-      return api.sendMessage(e, event.threadID, event.messageID);
+      try {
+        const local = await localTeachCreate(trigger, responses, uid);
+        return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${local.count || 0}`, event.threadID, event.messageID);
+      } catch (e2) {
+        const e = err.response?.data?.error || err.response?.data?.message || err.message;
+        return api.sendMessage(e, event.threadID, event.messageID);
+      }
     }
   } catch (err) {
     console.error(err);
