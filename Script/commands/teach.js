@@ -76,6 +76,55 @@ async function removeWithFallback(base, trigger, index) {
   }
 }
 
+async function postTeachWithFallback(base, trigger, responses, userID) {
+  const attempts = [];
+  const payloads = [
+    { trigger, responses, userID },
+    { ask: trigger, ans: responses, userID },
+    { q: trigger, a: responses, userID }
+  ];
+  // POST /teach with different payload shapes
+  for (const body of payloads) {
+    try {
+      return await axios.post(`${base}/teach`, body);
+    } catch (e1) {
+      attempts.push(`POST /teach body ${Object.keys(body).join(',')} -> ${e1.response?.status || e1.code || e1.message}`);
+      if (e1.response && e1.response.status !== 404 && e1.response.status !== 400 && e1.response.status !== 405)
+        throw e1;
+    }
+  }
+  // GET /teach as last resort
+  for (const params of payloads) {
+    try {
+      return await axios.get(`${base}/teach`, { params });
+    } catch (e2) {
+      attempts.push(`GET /teach params ${Object.keys(params).join(',')} -> ${e2.response?.status || e2.code || e2.message}`);
+      if (e2.response && e2.response.status !== 404 && e2.response.status !== 400 && e2.response.status !== 405)
+        throw e2;
+    }
+  }
+  const err = new Error(`Teach failed. Attempts: \n- ${attempts.join("\n- ")}`);
+  throw err;
+}
+
+async function listWithFallback(base, listAll) {
+  const attempts = [];
+  const endpoints = listAll
+    ? ["/list/all", "/all", "/listall", "/teaches/all"]
+    : ["/list", "/teaches", "/all"];
+  for (const ep of endpoints) {
+    try {
+      return await axios.get(`${base}${ep}`);
+    } catch (e) {
+      attempts.push(`${ep} -> ${e.response?.status || e.code || e.message}`);
+      if (e.response && e.response.status !== 404)
+        throw e;
+    }
+  }
+  const err = new Error(`List failed. Attempts: \n- ${attempts.join("\n- ")}`);
+  throw err;
+}
+
 module.exports.config = {
   name: "teach",
   version: "2.0.0",
@@ -122,9 +171,9 @@ module.exports.run = async function({ api, event, args, Users }) {
     // list flow
     if (args[0].toLowerCase() === "list") {
       try {
-        const endpoint = args[1] && args[1].toLowerCase() === "all" ? "/list/all" : "/list";
-        const res = await axios.get(`${base}${endpoint}`);
-        if (endpoint === "/list/all") {
+        const listAll = args[1] && args[1].toLowerCase() === "all";
+        const res = await listWithFallback(base, listAll);
+        if (listAll) {
           // Show teacher counts per user
           const data = res.data?.data || {};
           const entries = Object.entries(data);
@@ -138,7 +187,8 @@ module.exports.run = async function({ api, event, args, Users }) {
         }
         return api.sendMessage(res.data?.message || "📚 No data.", event.threadID, event.messageID);
       } catch (err) {
-        return api.sendMessage("❌ | Failed to fetch list.", event.threadID, event.messageID);
+        const e = err.response?.data?.error || err.response?.data?.message || err.message;
+        return api.sendMessage(e, event.threadID, event.messageID);
       }
     }
 
@@ -170,7 +220,7 @@ module.exports.run = async function({ api, event, args, Users }) {
       return api.sendMessage("❌ | Use: teach [trigger] - [response1, response2,...]", event.threadID, event.messageID);
     }
     try {
-      const res = await axios.post(`${base}/teach`, { trigger, responses, userID: uid });
+      const res = await postTeachWithFallback(base, trigger, responses, uid);
       return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${res.data.count || 0}`, event.threadID, event.messageID);
     } catch (err) {
       const e = err.response?.data?.error || err.response?.data?.message || err.message;
