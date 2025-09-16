@@ -10,6 +10,18 @@ async function getJanApiBase() {
   }
 }
 
+// Convert plain text to bold math letters/numbers (e.g., J -> 𝐉)
+function toBold(text) {
+  const mapChar = (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1D400 + (code - 65));
+    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1D41A + (code - 97));
+    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1D7CE + (code - 48));
+    return ch;
+  };
+  return text.split("").map(mapChar).join("");
+}
+
 // Prevent duplicate replies for the same incoming message
 const handledMessageIds = new Set();
 
@@ -51,7 +63,7 @@ module.exports = {
       if (result) {
         handledMessageIds.add(event.messageID);
         setTimeout(() => handledMessageIds.delete(event.messageID), 60000);
-        const styled = `𝐉𝐀𝐍 • ${result}`;
+        const styled = toBold(String(result));
         return api.sendMessage(styled, event.threadID, event.messageID);
       }
     } catch (err) {
