@@ -18,6 +18,47 @@ function toBold(text) {
   return String(text).split("").map(mapChar).join("");
 }
 
+// Helpers with endpoint fallbacks to avoid 404 on different deployments
+async function getMsgWithFallback(base, userMessage) {
+  const candidates = [
+    `${base}/msg`,
+    `${base}/message`,
+    `${base}/get`
+  ];
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const res = await axios.get(url, { params: { userMessage } });
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (e.response && e.response.status !== 404) break;
+    }
+  }
+  throw lastErr || new Error("Unable to reach Jan msg endpoint");
+}
+
+async function removeWithFallback(base, trigger, index) {
+  // Try DELETE with body
+  try {
+    return await axios.delete(`${base}/remove`, { data: { trigger, index } });
+  } catch (e1) {
+    // If route not found or method not allowed, try POST /remove
+    if (e1.response && (e1.response.status === 404 || e1.response.status === 405)) {
+      try {
+        return await axios.post(`${base}/remove`, { trigger, index });
+      } catch (e2) {
+        // Try GET with query params as last resort
+        if (e2.response && (e2.response.status === 404 || e2.response.status === 405)) {
+          return await axios.get(`${base}/remove`, { params: { trigger, index } });
+        }
+        throw e2;
+      }
+    }
+    throw e1;
+  }
+}
+
 module.exports.config = {
   name: "teach",
   version: "2.0.0",
@@ -53,10 +94,11 @@ module.exports.run = async function({ api, event, args, Users }) {
         return api.sendMessage("❌ | Index must be a number. Format: teach remove [trigger] - [index]", event.threadID, event.messageID);
       }
       try {
-        const res = await axios.delete(`${base}/remove`, { data: { trigger, index } });
-        return api.sendMessage(`${res.data.message || "✅ Removed"}`, event.threadID, event.messageID);
+        const res = await removeWithFallback(base, trigger, index);
+        return api.sendMessage(`${res.data?.message || "✅ Removed"}`, event.threadID, event.messageID);
       } catch (err) {
-        return api.sendMessage(`${err.response?.data?.error || err.message}`, event.threadID, event.messageID);
+        const e = err.response?.data?.error || err.response?.data?.message || err.message;
+        return api.sendMessage(e, event.threadID, event.messageID);
       }
     }
 
@@ -88,7 +130,7 @@ module.exports.run = async function({ api, event, args, Users }) {
       const searchTrigger = args.slice(1).join(" ");
       if (!searchTrigger) return api.sendMessage("❌ Provide a message to search.", event.threadID, event.messageID);
       try {
-        const res = await axios.get(`${base}/msg`, { params: { userMessage: searchTrigger.toLowerCase() } });
+        const res = await getMsgWithFallback(base, searchTrigger.toLowerCase());
         if (res.data?.message || res.data?.result) {
           const text = res.data.message || res.data.result;
           return api.sendMessage(toBold(text), event.threadID, event.messageID);
