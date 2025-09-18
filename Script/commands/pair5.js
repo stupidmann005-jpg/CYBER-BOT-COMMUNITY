@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair5",
-  version: "1.3.0",
+  version: "1.2.0",
   hasPermssion: 2, // Admin level by default
   credits: "CYBER TEAM (modified by GPT)",
   description: "VIP-only: Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
@@ -23,15 +23,6 @@ const VIP_USERS = ["100012345678901", "100098765432112"]; // Replace with your V
 
 // Facebook app token
 const FB_APP_TOKEN = "6628568379|c1e620fa708a1d5696fb991c1bde5662";
-
-// ✅ Multiple font styles for VIP text
-const fonts = [
-  Jimp.FONT_SANS_16_BLACK,
-  Jimp.FONT_SANS_32_BLACK,
-  Jimp.FONT_SANS_32_WHITE,
-  Jimp.FONT_SANS_64_BLACK,
-  Jimp.FONT_SANS_64_WHITE
-];
 
 // ensure directory + background
 async function ensureCanvasDir() {
@@ -65,8 +56,8 @@ async function prepareAvatar(imagePath, bgWidth = 1200) {
 
   // scale avatar relative to background width
   const size = Math.floor(bgWidth * 0.25); // 25% of background width
-  const borderSize = Math.floor(size * 0.08); // 8% border
-  const shadowOffset = Math.floor(size * 0.1); // 10% shadow offset
+  const borderSize = Math.floor(size * 0.05); // 8% border
+  const shadowOffset = Math.floor(size * 0.05); // 10% shadow offset
 
   avatar.resize(size, size);
 
@@ -84,14 +75,16 @@ async function prepareAvatar(imagePath, bgWidth = 1200) {
   return canvas;
 }
 
-// create the paired image with proportional avatars and random font text
-async function makeImage({ one, two, text }) {
+// create the paired image with proportional avatars
+async function makeImage({ one, two }) {
   const dir = await ensureCanvasDir();
   const bgPath = await ensureBackground();
   let pair_bg = await Jimp.read(bgPath);
 
   const bgWidth = 1200;
   const bgHeight = 700;
+
+  // resize background
   pair_bg = pair_bg.resize(bgWidth, bgHeight);
 
   const avatarOne = path.join(dir, `avt_${one}.png`);
@@ -104,6 +97,7 @@ async function makeImage({ one, two, text }) {
   const imgOne = await prepareAvatar(avatarOne, bgWidth);
   const imgTwo = await prepareAvatar(avatarTwo, bgWidth);
 
+  // center avatars horizontally & vertically
   const leftX = Math.floor(bgWidth * 0.15);
   const rightX = Math.floor(bgWidth * 0.60);
   const yPos = Math.floor(bgHeight * 0.25);
@@ -111,24 +105,6 @@ async function makeImage({ one, two, text }) {
   pair_bg
     .composite(imgOne, leftX, yPos)
     .composite(imgTwo, rightX, yPos);
-
-  // ✅ Pick a random font style
-  const fontPath = fonts[Math.floor(Math.random() * fonts.length)];
-  const font = await Jimp.loadFont(fontPath);
-
-  // Print the VIP text message in the center-bottom
-  pair_bg.print(
-    font,
-    0,
-    bgHeight - 200, // adjust vertical position
-    {
-      text: text,
-      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-    },
-    bgWidth,
-    180 // height allocated for text
-  );
 
   await pair_bg.writeAsync(outPath);
 
@@ -183,17 +159,10 @@ module.exports.run = async function ({ api, event, permssion }) {
       { id: partnerID, tag: partnerName }
     ];
 
-    // ✅ VIP pairing text message
-    const vipText = `🥰 VIP Pairing Successful!
-• ${senderName} 🎀
-• ${partnerName} 🎀
-💌 Wishing you 200 years of happiness 💕
-\nLove percentage: ${matchRate} 💙`;
-
-    const pathImg = await makeImage({ one: senderID, two: partnerID, text: vipText });
+    const pathImg = await makeImage({ one: senderID, two: partnerID });
 
     api.sendMessage({
-      body: vipText,
+      body: `body: `💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
       mentions,
       attachment: fs.createReadStream(pathImg)
     }, threadID, () => {
