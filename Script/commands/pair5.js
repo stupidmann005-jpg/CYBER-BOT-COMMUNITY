@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair5",
-  version: "1.2.1",
+  version: "1.2.2",
   hasPermssion: 2, // Admin level by default
   credits: "CYBER TEAM (modified by GPT)",
   description: "VIP-only: Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
@@ -115,11 +115,11 @@ async function makeImage({ one, two }) {
 }
 
 // main command
-module.exports.run = async function ({ api, event, permssion }) {
+module.exports.run = async function ({ api, event, permission }) {
   const { threadID, messageID, senderID } = event;
 
   // ✅ VIP/Admin check
-  const isVIP = (typeof permssion !== "undefined" && permssion >= 2) || VIP_USERS.includes(senderID);
+  const isVIP = (typeof permission !== "undefined" && permission >= 2) || VIP_USERS.includes(senderID);
 
   if (!isVIP) {
     return api.sendMessage(
