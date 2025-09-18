@@ -162,7 +162,7 @@ module.exports.run = async function ({ api, event, permssion }) {
     const pathImg = await makeImage({ one: senderID, two: partnerID });
 
     api.sendMessage({
-      body: `body: `💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
+      body: `💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
       mentions,
       attachment: fs.createReadStream(pathImg)
     }, threadID, () => {
