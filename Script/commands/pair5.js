@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair5",
-  version: "1.1.0",
+  version: "1.2.0",
   hasPermssion: 2, // Admin level by default
   credits: "CYBER TEAM (modified by GPT)",
   description: "VIP-only: Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
@@ -30,6 +30,7 @@ async function ensureCanvasDir() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+
 async function ensureBackground() {
   const dir = await ensureCanvasDir();
   const bgPath = path.join(dir, "pair_bg.jpg");
@@ -49,9 +50,15 @@ async function fetchAvatar(fbId, outPath) {
   return outPath;
 }
 
-// prepare avatar with border + shadow
-async function prepareAvatar(imagePath, size = 300, borderSize = 8, shadowOffset = 10) {
+// prepare avatar with proportional size, border & shadow
+async function prepareAvatar(imagePath, bgWidth = 1200) {
   const avatar = await Jimp.read(imagePath);
+
+  // scale avatar relative to background width
+  const size = Math.floor(bgWidth * 0.25); // 25% of background width
+  const borderSize = Math.floor(size * 0.08); // 8% border
+  const shadowOffset = Math.floor(size * 0.1); // 10% shadow offset
+
   avatar.resize(size, size);
 
   const canvasSize = size + borderSize * 2 + shadowOffset;
@@ -68,11 +75,17 @@ async function prepareAvatar(imagePath, size = 300, borderSize = 8, shadowOffset
   return canvas;
 }
 
-// create the paired image
+// create the paired image with proportional avatars
 async function makeImage({ one, two }) {
   const dir = await ensureCanvasDir();
   const bgPath = await ensureBackground();
-  const pair_bg = await Jimp.read(bgPath);
+  let pair_bg = await Jimp.read(bgPath);
+
+  const bgWidth = 1200;
+  const bgHeight = 700;
+
+  // resize background
+  pair_bg = pair_bg.resize(bgWidth, bgHeight);
 
   const avatarOne = path.join(dir, `avt_${one}.png`);
   const avatarTwo = path.join(dir, `avt_${two}.png`);
@@ -81,12 +94,17 @@ async function makeImage({ one, two }) {
   await fetchAvatar(one, avatarOne);
   await fetchAvatar(two, avatarTwo);
 
-  const imgOne = await prepareAvatar(avatarOne);
-  const imgTwo = await prepareAvatar(avatarTwo);
+  const imgOne = await prepareAvatar(avatarOne, bgWidth);
+  const imgTwo = await prepareAvatar(avatarTwo, bgWidth);
+
+  // center avatars horizontally & vertically
+  const leftX = Math.floor(bgWidth * 0.15);
+  const rightX = Math.floor(bgWidth * 0.60);
+  const yPos = Math.floor(bgHeight * 0.25);
 
   pair_bg
-    .composite(imgOne, 190, 180) // left avatar
-    .composite(imgTwo, 750, 180); // right avatar
+    .composite(imgOne, leftX, yPos)
+    .composite(imgTwo, rightX, yPos);
 
   await pair_bg.writeAsync(outPath);
 
