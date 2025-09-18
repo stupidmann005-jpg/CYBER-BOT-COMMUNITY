@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "pair5",
-  version: "3.0.0",
+  version: "5.1.0",
   hasPermssion: 0,
-  credits: "𝐂𝐘𝐁𝐄𝐑 ☢️ 𖣘 BOT TEAM (Modified by GPT)",
-  description: "Pair two users with a romantic heart background (VIP only, square avatars + design + glow)",
+  credits: "𝐂𝐘𝐁𝐄𝐑 ☢️ 𖣘 BOT TEAM (Improved by GPT)",
+  description: "VIP romantic pairing — square avatars, border, glow, opposite-gender pairing, random text style",
   commandCategory: "Picture",
   cooldowns: 5,
   dependencies: {
@@ -17,187 +17,279 @@ module.exports.onLoad = async () => {
   const { resolve } = global.nodemodule["path"];
   const { existsSync, mkdirSync } = global.nodemodule["fs-extra"];
   const { downloadFile } = global.utils;
-  const dirMaterial = __dirname + `/cache/canvas/`;
-  const path = resolve(__dirname, "cache/canvas", "pair5_bg.jpg");
+  const dirMaterial = resolve(__dirname, "cache", "canvas");
 
   if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
-  if (!existsSync(path)) {
+
+  const bgPath = resolve(__dirname, "cache", "canvas", "pair5_bg.jpg");
+  if (!existsSync(bgPath)) {
     await downloadFile(
       "https://i.postimg.cc/9XRszsCc/background-for-the-festival-of-love-and-valentine-video.jpg",
-      path
+      bgPath
     );
   }
 };
 
-// helper: fetch avatar
-async function fetchAvatar(uid, path) {
+// === helpers ===
+
+// write avatar binary safely
+async function fetchAvatar(uid, outPath) {
   const axios = global.nodemodule["axios"];
   const fs = global.nodemodule["fs-extra"];
-  const url = `https://graph.facebook.com/${uid}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
-  const img = (await axios.get(url, { responseType: "arraybuffer" })).data;
-  fs.writeFileSync(path, Buffer.from(img, "utf-8"));
-  return path;
+  try {
+    const url = `https://graph.facebook.com/${uid}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+    const res = await axios.get(url, { responseType: "arraybuffer", maxRedirects: 5 });
+    fs.writeFileSync(outPath, Buffer.from(res.data)); // binary write
+    return outPath;
+  } catch (err) {
+    throw new Error(`Failed to download avatar for ${uid}: ${err.message}`);
+  }
 }
 
-// helper: decorate avatar (square + border + shadow)
-async function prepareAvatar(path, size = 160, border = 6, shadowOffset = 6) {
-  const jimp = global.nodemodule["jimp"];
-  const avatar = await jimp.read(path);
+// make square avatar with border + shadow
+async function prepareAvatar(avatarPath, opts = {}) {
+  const Jimp = global.nodemodule["jimp"];
+  const { size = 160, border = 8, shadowOffset = 8, borderColor = 0xffffffff, shadowColor = 0x000000aa } = opts;
+
+  const avatar = await Jimp.read(avatarPath);
   avatar.resize(size, size);
 
   const canvasSize = size + border * 2 + shadowOffset;
-  const canvas = new jimp(canvasSize, canvasSize, 0x00000000);
+  const canvas = new Jimp(canvasSize, canvasSize, 0x00000000); // transparent
 
-  // black shadow
-  const shadow = new jimp(size + border * 2, size + border * 2, 0x000000aa);
+  const shadow = new Jimp(size + border * 2, size + border * 2, shadowColor);
   canvas.composite(shadow, shadowOffset, shadowOffset);
 
-  // white border
-  const borderImg = new jimp(size + border * 2, size + border * 2, 0xffffffff);
+  const borderImg = new Jimp(size + border * 2, size + border * 2, borderColor);
   canvas.composite(borderImg, 0, 0);
 
-  // avatar inside
   canvas.composite(avatar, border, border);
 
   return canvas;
 }
 
-async function makeImage({ one, two }) {
-  const fs = global.nodemodule["fs-extra"];
-  const path = global.nodemodule["path"];
-  const jimp = global.nodemodule["jimp"];
-  const __root = path.resolve(__dirname, "cache", "canvas");
-
-  let pair_bg = await jimp.read(__root + "/pair5_bg.jpg");
-  let pathImg = __root + `/pair5_${one}_${two}.png`;
-  let avatarOne = __root + `/avt_${one}.png`;
-  let avatarTwo = __root + `/avt_${two}.png`;
-
-  // download avatars
-  await fetchAvatar(one, avatarOne);
-  await fetchAvatar(two, avatarTwo);
-
-  // decorate avatars
-  const imgOne = await prepareAvatar(avatarOne);
-  const imgTwo = await prepareAvatar(avatarTwo);
-
-  // position them
-  pair_bg
-    .composite(imgOne, 100, 100) // left
-    .composite(imgTwo, 410, 100); // right
-
-  // ❤️ emoji in the middle
-  const font = await jimp.loadFont(jimp.FONT_SANS_64_WHITE);
-  pair_bg.print(font, 350, 180, { text: "❤️", alignmentX: jimp.HORIZONTAL_ALIGN_CENTER });
-
-  // gradient overlay (romantic pink/purple)
-  const gradient = new jimp(pair_bg.bitmap.width, pair_bg.bitmap.height, (x, y, idx) => {
-    const ratio = y / pair_bg.bitmap.height;
-    const r = 255 - Math.floor(80 * ratio); // soft red -> pink
-    const g = 50 + Math.floor(30 * ratio);  // darker red -> magenta
-    const b = 100 + Math.floor(80 * ratio); // purple
-    const a = 80; // transparency
-    return (r << 24) | (g << 16) | (b << 8) | a;
-  });
-  pair_bg.composite(gradient, 0, 0, { mode: jimp.BLEND_OVERLAY, opacitySource: 0.3 });
-
-  // glowing effect by duplicating avatars with blur
-  const glow = imgOne.clone().resize(200, 200).blur(15);
-  pair_bg.composite(glow, 90, 90, { opacitySource: 0.4 });
-  const glow2 = imgTwo.clone().resize(200, 200).blur(15);
-  pair_bg.composite(glow2, 400, 90, { opacitySource: 0.4 });
-
-  let raw = await pair_bg.getBufferAsync("image/png");
-  fs.writeFileSync(pathImg, raw);
-
-  fs.unlinkSync(avatarOne);
-  fs.unlinkSync(avatarTwo);
-
-  return pathImg;
+// draw a simple vertical gradient overlay (soft romantic)
+async function makeGradientOverlay(width, height) {
+  const Jimp = global.nodemodule["jimp"];
+  const overlay = new Jimp(width, height, 0x00000000);
+  for (let y = 0; y < height; y++) {
+    // adjust colors to taste (pink -> purple)
+    const ratio = y / height;
+    const r = 255 - Math.floor(100 * ratio); // 255 -> 155
+    const g = 60 + Math.floor(40 * ratio);   // 60 -> 100
+    const b = 120 + Math.floor(80 * ratio);  // 120 -> 200
+    const a = Math.floor(60); // constant alpha (0-255)
+    // Jimp color integer: (r << 24) | (g << 16) | (b << 8) | a
+    const color = (r << 24) | (g << 16) | (b << 8) | a;
+    const line = new Jimp(width, 1, color);
+    overlay.composite(line, 0, y);
+  }
+  return overlay;
 }
 
-// VIP check
+// random styled message pool
+function getStyledMessage(senderName, partnerName, matchRate) {
+  const styles = [
+`💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖
+
+💘 ${senderName} has been paired with ${partnerName}
+💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}
+✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
+`💖 ＶＩＰ Ｒｏｍａｎｔｉｃ Ｐａｉｒｉｎｇ 💖
+
+💘 ${senderName} ❤ ${partnerName}
+💓 Ｌｏｖｅ Ｃｏｍｐａｔｉｂｉｌｉｔｙ: ${matchRate}
+✨ Ｗｉｓｈｉｎｇ ｙｏｕ 𝓮𝓽𝓮𝓻𝓷𝓪𝓵 𝓵𝓸𝓿𝓮!`,
+`💖 𝓥𝓲𝓹 𝓡𝓸𝓶𝓪𝓷𝓽𝓲𝓬 𝓟𝓪𝓲𝓻𝓲𝓷𝓰 💖
+
+💘 ${senderName} 💕 ${partnerName}
+💓 𝓛𝓸𝓿𝓮 𝓒𝓸𝓶𝓹𝓪𝓽𝓲𝓫𝓲𝓵𝓲𝓽𝔂: ${matchRate}
+✨ 𝓜𝓪𝔂 𝔂𝓸𝓾𝓻 𝓵𝓸𝓿𝓮 𝓼𝓱𝓲𝓷𝓮 𝓫𝓻𝓲𝓰𝓱𝓽!`,
+`💖 ᴠɪᴘ ʀᴏᴍᴀɴᴛɪᴄ ᴘᴀɪʀɪɴɢ 💖
+
+💘 ${senderName} 🎀 ${partnerName}
+💓 Love Compatibility: ${matchRate}
+✨ May your love shine as bright as the stars!`,
+`💖 ✨ VＩＰ 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 ✨ 💖
+
+💘 ${senderName} 💞 ${partnerName}
+💓 Love Compatibility: ${matchRate}
+🌙 May your love be endless ✨`
+  ];
+  return styles[Math.floor(Math.random() * styles.length)];
+}
+
+// === image composer ===
+async function makeImage({ one, two }) {
+  const fs = global.nodemodule["fs-extra"];
+  const pathMod = global.nodemodule["path"];
+  const Jimp = global.nodemodule["jimp"];
+
+  const root = pathMod.resolve(__dirname, "cache", "canvas");
+  const bgPath = pathMod.join(root, "pair5_bg.jpg");
+  const outPath = pathMod.join(root, `pair5_${one}_${two}.png`);
+  const avatarOnePath = pathMod.join(root, `avt_${one}.png`);
+  const avatarTwoPath = pathMod.join(root, `avt_${two}.png`);
+
+  // download (throws on failure)
+  await fetchAvatar(one, avatarOnePath);
+  await fetchAvatar(two, avatarTwoPath);
+
+  // prepare
+  const imgOne = await prepareAvatar(avatarOnePath, { size: 170, border: 8, shadowOffset: 8 });
+  const imgTwo = await prepareAvatar(avatarTwoPath, { size: 170, border: 8, shadowOffset: 8 });
+
+  // load background
+  const bg = await Jimp.read(bgPath);
+
+  // dynamic positions (centered)
+  const bgW = bg.bitmap.width;
+  const bgH = bg.bitmap.height;
+  const avatarW = imgOne.bitmap.width;
+  const avatarH = imgOne.bitmap.height;
+
+  // place them at ~left/right thirds and vertically centered-ish
+  const leftX = Math.floor(bgW * 0.16);
+  const rightX = Math.floor(bgW * 0.66);
+  const yPos = Math.floor(bgH * 0.28);
+
+  // glow behind avatars
+  const glow1 = imgOne.clone().resize(Math.floor(avatarW * 1.3), Math.floor(avatarH * 1.3)).blur(20);
+  const glow2 = imgTwo.clone().resize(Math.floor(avatarW * 1.3), Math.floor(avatarH * 1.3)).blur(20);
+  bg.composite(glow1, leftX - Math.floor((glow1.bitmap.width - avatarW)/2) - 4, yPos - Math.floor((glow1.bitmap.height - avatarH)/2) - 6, { opacitySource: 0.45 });
+  bg.composite(glow2, rightX - Math.floor((glow2.bitmap.width - avatarW)/2) - 4, yPos - Math.floor((glow2.bitmap.height - avatarH)/2) - 6, { opacitySource: 0.45 });
+
+  // avatars on top
+  bg.composite(imgOne, leftX, yPos);
+  bg.composite(imgTwo, rightX, yPos);
+
+  // heart in middle
+  const heartFont = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+  const heartX = Math.floor(bgW / 2) - 32;
+  const heartY = Math.floor(yPos + avatarH/4) - 40;
+  bg.print(heartFont, heartX, heartY, { text: "❤️", alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER });
+
+  // gradient overlay
+  const gradient = await makeGradientOverlay(bgW, bgH);
+  bg.composite(gradient, 0, 0, { mode: Jimp.BLEND_OVERLAY, opacitySource: 0.35 });
+
+  // scattered sparkles (few)
+  const sparkleFont = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
+  const sparkles = 8;
+  for (let i = 0; i < sparkles; i++) {
+    const sx = Math.floor(Math.random() * bgW * 0.9);
+    const sy = Math.floor(Math.random() * bgH * 0.9);
+    bg.print(sparkleFont, sx, sy, Math.random() > 0.5 ? "✨" : "💕");
+  }
+
+  // footer quote placeholder (left blank; the run function picks message text)
+  // Write final image
+  await bg.writeAsync(outPath);
+
+  // cleanup temp avatars
+  try { if (fs.existsSync(avatarOnePath)) fs.unlinkSync(avatarOnePath); } catch(e){}
+  try { if (fs.existsSync(avatarTwoPath)) fs.unlinkSync(avatarTwoPath); } catch(e){}
+
+  return outPath;
+}
+
+// simple VIP checker (unchanged)
 async function isVIP(api, userID) {
   try {
     const botOwners = global.config.ADMINBOT || [];
     const ndh = global.config.NDH || [];
-    const vipUsers = [
-      "61553564375586",
-      "61576520552554",
-      "61550035211214"
-    ];
+    const vipUsers = ["61553564375586", "61576520552554", "61550035211214"];
     return botOwners.includes(userID) || ndh.includes(userID) || vipUsers.includes(userID);
-  } catch (error) {
-    console.error("Error checking VIP status:", error);
+  } catch (err) {
+    console.error("VIP check error:", err);
     return false;
   }
 }
 
-// random fancy text templates
-function getStyledMessage(senderName, partnerName, matchRate) {
-  const styles = [
-    `‎💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
-    `💖 ＶＩＰ Ｒｏｍａｎｔｉｃ Ｐａｉｒｉｎｇ 💖\n\n💘 ${senderName} ❤ ${partnerName}\n💓 Ｌｏｖｅ Ｃｏｍｐａｔｉｂｉｌｉ𝘁𝘺: ${matchRate}\n✨ Ｗｉｓｈｉｎｇ ｙｏｕ ｅｔｅｒｎａｌ ｌｏｖｅ!`,
-    `💖 𝑉𝐼𝑃 𝑅𝑜𝑚𝑎𝑛𝑡𝑖𝑐 𝑃𝑎𝑖𝑟𝑖𝑛𝑔 💖\n\n💘 ${senderName} 💕 ${partnerName}\n💓 𝐿𝑜𝑣𝑒 𝐶𝑜𝑚𝑝𝑎𝑡𝑖𝑏𝑖𝑙𝑖𝑡𝑦: ${matchRate}\n✨ 𝑀𝑎𝑦 𝑦𝑜𝑢𝑟 ℎ𝑒𝑎𝑟𝑡𝑠 𝑠𝑡𝑎𝑦 𝑎𝑠 𝑜𝑛𝑒!`,
-    `💖 🆅🅸🅿 🆁🅾🅼🅰🅽🆃🅸🅲 🅿🅰🅸🆁🅸🅽🅶 💖\n\n💘 ${senderName} 💘 ${partnerName}\n💓 🅻🅾🆅🅴 🅲🅾🅼🅿🅰🆃🅸🅱🅸🅻🅸🆃🆈: ${matchRate}\n✨ 🅼🅰🆈 🆈🅾🆄🆁 🅻🅾🆅🅴 🆂🅷🅸🅽🅴 🅵🅾🆁🅴🆅🅴🆁!`,
-    `💖 𝓥𝓘𝓟 𝓡𝓸𝓶𝓪𝓷𝓽𝓲𝓬 𝓟𝓪𝓲𝓻𝓲𝓷𝓰 💖\n\n💘 ${senderName} 🤍 ${partnerName}\n💓 𝓛𝓸𝓿𝓮 𝓒𝓸𝓶𝓹𝓪𝓽𝓲𝓫𝓲𝓵𝓲𝓽𝔂: ${matchRate}\n✨ 𝓦𝓲𝓼𝓱𝓲𝓷𝓰 𝔂𝓸𝓾 𝓯𝓸𝓻𝓮𝓿𝓮𝓻 𝓵𝓸𝓿𝓮!`,
-    `💖 ᐯᑎᑭ ᖇOᗰᗩᑎTIᑕ ᑭᗩIᖇIᑎG 💖\n\n💘 ${senderName} 💞 ${partnerName}\n💓 ᒪOᐯE ᑕOᗰᑭᗩTIᗷIᒪITᎩ: ${matchRate}\n✨ ᗰᗩᎩ YOᑌᖇ ᒪOᐯE ᔕᕼIᑎE ᖴOᖇEᐯEᖇ!`
-  ];
-
-  return styles[Math.floor(Math.random() * styles.length)];
-}
-
+// === main run ===
 module.exports.run = async function ({ api, event }) {
-  const { threadID, messageID, senderID } = event;
   const fs = global.nodemodule["fs-extra"];
+  const { threadID, messageID, senderID } = event;
 
-  const isUserVIP = await isVIP(api, senderID);
-  if (!isUserVIP) {
-    return api.sendMessage("❌ This command is only available for VIP users.", threadID, messageID);
-  }
+  try {
+    const allowed = await isVIP(api, senderID);
+    if (!allowed) {
+      return api.sendMessage("❌ This command is only available for VIP users.", threadID, messageID);
+    }
 
-  const percentages = ["21%", "67%", "19%", "37%", "17%", "96%", "52%", "62%", "76%", "83%", "100%", "99%", "0%", "48%"];
-  const matchRate = percentages[Math.floor(Math.random() * percentages.length)];
+    const percentages = ["21%", "67%", "19%", "37%", "17%", "96%", "52%", "62%", "76%", "83%", "100%", "99%", "0%", "48%"];
+    const matchRate = percentages[Math.floor(Math.random() * percentages.length)];
 
-  // sender info
-  let senderInfo = await api.getUserInfo(senderID);
-  let senderName = senderInfo[senderID].name;
-  let senderGender = senderInfo[senderID].gender || "unknown";
+    // sender info + gender (may be undefined)
+    const senderInfo = await api.getUserInfo(senderID);
+    const senderName = senderInfo?.[senderID]?.name || "You";
+    const senderGender = senderInfo?.[senderID]?.gender || "unknown";
 
-  // thread info
-  let threadInfo = await api.getThreadInfo(threadID);
-  let candidates = threadInfo.participantIDs.filter(id => id !== senderID);
-  let usersInfo = await api.getUserInfo(...candidates);
+    // thread participants (exclude sender)
+    const threadInfo = await api.getThreadInfo(threadID);
+    let participants = Array.isArray(threadInfo?.participantIDs) ? threadInfo.participantIDs.filter(id => id !== senderID) : [];
 
-  // filter opposite gender
-  let oppositeGenderUsers = candidates.filter(uid => {
-    let g = usersInfo[uid].gender || "unknown";
-    return (senderGender === "male" && g === "female") ||
-           (senderGender === "female" && g === "male");
-  });
+    if (!participants.length) {
+      return api.sendMessage("⚠️ No other participants in this thread to pair with.", threadID, messageID);
+    }
 
-  // pick partner
-  let partnerID;
-  if (oppositeGenderUsers.length > 0) {
-    partnerID = oppositeGenderUsers[Math.floor(Math.random() * oppositeGenderUsers.length)];
-  } else {
-    partnerID = candidates[Math.floor(Math.random() * candidates.length)];
-  }
+    // fetch each participant info (robust)
+    const usersInfo = {};
+    for (const uid of participants) {
+      try {
+        const info = await api.getUserInfo(uid);
+        usersInfo[uid] = info?.[uid] || {};
+      } catch (e) {
+        usersInfo[uid] = {};
+      }
+    }
 
-  let partnerInfo = usersInfo[partnerID];
-  let partnerName = partnerInfo.name;
+    // filter opposite gender (if sender gender available)
+    let opposite = [];
+    if (senderGender === "male" || senderGender === "female") {
+      for (const uid of participants) {
+        const g = usersInfo[uid]?.gender || "unknown";
+        if ((senderGender === "male" && g === "female") || (senderGender === "female" && g === "male")) {
+          opposite.push(uid);
+        }
+      }
+    }
 
-  let mentions = [
-    { id: senderID, tag: senderName },
-    { id: partnerID, tag: partnerName }
-  ];
+    // choose partner (opposite first, fallback to random)
+    let partnerID;
+    if (opposite.length > 0) partnerID = opposite[Math.floor(Math.random() * opposite.length)];
+    else partnerID = participants[Math.floor(Math.random() * participants.length)];
 
-  let one = senderID, two = partnerID;
-  return makeImage({ one, two }).then(path => {
+    const partnerName = usersInfo[partnerID]?.name || (await (await api.getUserInfo(partnerID))[partnerID]?.name) || "Partner";
+
+    // create image (wrapped so we can catch errors)
+    let imagePath;
+    try {
+      imagePath = await makeImage({ one: senderID, two: partnerID });
+    } catch (imgErr) {
+      console.error("Image generation error:", imgErr);
+      return api.sendMessage(`⚠️ Failed to generate image: ${imgErr.message || String(imgErr)}`, threadID, messageID);
+    }
+
+    const mentions = [
+      { id: senderID, tag: senderName },
+      { id: partnerID, tag: partnerName }
+    ];
+
+    // styled message
+    const bodyText = getStyledMessage(senderName, partnerName, matchRate);
+
+    // send (and cleanup image)
     api.sendMessage({
-      body: getStyledMessage(senderName, partnerName, matchRate),
+      body: bodyText,
       mentions,
-      attachment: fs.createReadStream(path)
-    }, threadID, () => fs.unlinkSync(path), messageID);
-  });
+      attachment: fs.createReadStream(imagePath)
+    }, threadID, () => {
+      try { if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath); } catch (e) {}
+    }, messageID);
+
+  } catch (err) {
+    console.error("pair5 command error:", err);
+    return api.sendMessage(`⚠️ Something went wrong: ${err.message || String(err)}`, threadID, messageID);
+  }
 };
