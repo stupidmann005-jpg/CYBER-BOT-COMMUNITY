@@ -56,8 +56,8 @@ async function prepareAvatar(imagePath, bgWidth = 1200) {
 
   // scale avatar relative to background width
   const size = Math.floor(bgWidth * 0.25); // 25% of background width
-  const borderSize = Math.floor(size * 0.08); // 8% border
-  const shadowOffset = Math.floor(size * 0.1); // 10% shadow offset
+  const borderSize = Math.floor(size * 0.05); // 8% border
+  const shadowOffset = Math.floor(size * 0.05); // 10% shadow offset
 
   avatar.resize(size, size);
 
