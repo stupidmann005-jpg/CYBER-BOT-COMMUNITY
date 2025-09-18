@@ -1,12 +1,12 @@
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
-const Jimp = require("jimp");
+const Jimp = require("jimp"); // ✅ Image processing library
 
 module.exports.config = {
   name: "pair5",
-  version: "1.2.2",
-  hasPermssion: 2, // Admin level by default
+  version: "1.2.4",
+  hasPermssion: 0, // ✅ allow everyone, VIP/Admin checked inside run()
   credits: "CYBER TEAM (modified by GPT)",
   description: "VIP-only: Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
   commandCategory: "Picture",
@@ -24,7 +24,7 @@ const VIP_USERS = ["100012345678901", "100098765432112"]; // Replace with your V
 // Facebook app token
 const FB_APP_TOKEN = "6628568379|c1e620fa708a1d5696fb991c1bde5662";
 
-// ensure directory + background
+// ensure canvas directory + background
 async function ensureCanvasDir() {
   const dir = path.join(__dirname, "cache", "canvas");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -54,10 +54,9 @@ async function fetchAvatar(fbId, outPath) {
 async function prepareAvatar(imagePath, bgWidth = 1200) {
   const avatar = await Jimp.read(imagePath);
 
-  // scale avatar relative to background width
-  const size = Math.floor(bgWidth * 0.25); // 25% of background width
-  const borderSize = Math.floor(size * 0.05); // 5% border
-  const shadowOffset = Math.floor(size * 0.05); // 5% shadow offset
+  const size = Math.floor(bgWidth * 0.25);
+  const borderSize = Math.floor(size * 0.05);
+  const shadowOffset = Math.floor(size * 0.05);
 
   avatar.resize(size, size);
 
@@ -75,7 +74,7 @@ async function prepareAvatar(imagePath, bgWidth = 1200) {
   return canvas;
 }
 
-// create the paired image with proportional avatars
+// create the paired image
 async function makeImage({ one, two }) {
   const dir = await ensureCanvasDir();
   const bgPath = await ensureBackground();
@@ -84,7 +83,6 @@ async function makeImage({ one, two }) {
   const bgWidth = 1200;
   const bgHeight = 700;
 
-  // resize background
   pair_bg = pair_bg.resize(bgWidth, bgHeight);
 
   const avatarOne = path.join(dir, `avt_${one}.png`);
@@ -97,7 +95,6 @@ async function makeImage({ one, two }) {
   const imgOne = await prepareAvatar(avatarOne, bgWidth);
   const imgTwo = await prepareAvatar(avatarTwo, bgWidth);
 
-  // center avatars horizontally & vertically
   const leftX = Math.floor(bgWidth * 0.15);
   const rightX = Math.floor(bgWidth * 0.60);
   const yPos = Math.floor(bgHeight * 0.25);
@@ -135,23 +132,23 @@ module.exports.run = async function ({ api, event, permission }) {
   try {
     const senderInfo = await api.getUserInfo(senderID);
     const senderName = senderInfo[senderID]?.name || "You";
-    const senderGender = senderInfo[senderID]?.gender || "unknown";
 
+    // Get thread participants
     const threadInfo = await api.getThreadInfo(threadID);
     const participants = threadInfo?.participantIDs?.filter(id => id !== senderID) || [];
 
     let partnerID;
-    let opposite = [];
+    let oppositeGender = [];
 
     for (let uid of participants) {
       let info = await api.getUserInfo(uid);
-      if (info[uid]?.gender && info[uid].gender !== senderGender) {
-        opposite.push(uid);
+      if (info[uid]?.gender && info[uid].gender !== senderInfo[senderID]?.gender) {
+        oppositeGender.push(uid);
       }
     }
 
-    if (opposite.length > 0) {
-      partnerID = opposite[Math.floor(Math.random() * opposite.length)];
+    if (oppositeGender.length > 0) {
+      partnerID = oppositeGender[Math.floor(Math.random() * oppositeGender.length)];
     } else {
       partnerID = participants.length ? participants[Math.floor(Math.random() * participants.length)] : senderID;
     }
@@ -175,6 +172,7 @@ module.exports.run = async function ({ api, event, permission }) {
     }, messageID);
 
   } catch (err) {
-    api.sendMessage(`⚠️ Error generating pair image: ${err?.message || String(err)}`, threadID, messageID);
+    console.error(err);
+    return api.sendMessage(`⚠️ Error generating pair image: ${err?.message || String(err)}`, threadID, messageID);
   }
 };
