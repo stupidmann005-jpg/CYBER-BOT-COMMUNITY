@@ -40,7 +40,7 @@ async function ensureGifBackground() {
   const dir = await ensureCanvasDir();
   const gifPath = path.join(dir, "pair_bg.gif");
   if (!fs.existsSync(gifPath)) {
-    const url = "https://example.com/path/to/your/background.gif"; // Replace with actual URL of GIF
+    const url = "https://tenor.com/view/hearts-glitter-s-parkle-gif-11782362"; // Replace with actual URL of GIF
     const res = await axios.get(url, { responseType: "arraybuffer", maxRedirects: 5 });
     fs.writeFileSync(gifPath, Buffer.from(res.data));
   }
