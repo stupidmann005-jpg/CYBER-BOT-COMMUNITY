@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "pair5",
-  version: "3.1.0",
+  version: "3.0.0",
   hasPermssion: 0,
   credits: "𝐂𝐘𝐁𝐄𝐑 ☢️ 𖣘 BOT TEAM (Modified by GPT)",
-  description: "Pair two users with a romantic heart background (VIP only, square avatars + design + glow, opposite gender pairing)",
+  description: "Pair two users with a romantic heart background (VIP only, square avatars + design + glow)",
   commandCategory: "Picture",
   cooldowns: 5,
   dependencies: {
@@ -23,7 +23,7 @@ module.exports.onLoad = async () => {
   if (!existsSync(dirMaterial)) mkdirSync(dirMaterial, { recursive: true });
   if (!existsSync(path)) {
     await downloadFile(
-      "https://i.postimg.cc/44zpjGWD/background-for-the-festival-of-love-and-valentine-video.jpg",
+      "https://png.pngtree.com/thumb_back/fh260/background/20240204/pngtree-lovely-happy-valentines-day-background-with-realistic-3d-hearts-design-image_15600712.png",
       path
     );
   }
@@ -147,29 +147,10 @@ module.exports.run = async function ({ api, event }) {
 
   let senderInfo = await api.getUserInfo(senderID);
   let senderName = senderInfo[senderID].name;
-  let senderGender = senderInfo[senderID].gender; // "male" / "female" / "unknown"
 
   let threadInfo = await api.getThreadInfo(threadID);
   let participants = threadInfo.participantIDs.filter(id => id !== senderID);
-
-  // get gender info of participants
-  let participantsInfo = await api.getUserInfo(participants);
-
-  // filter opposite gender
-  let oppositeGenderParticipants = participants.filter(id => {
-    let g = participantsInfo[id].gender;
-    return senderGender && g && g !== senderGender;
-  });
-
-  let partnerID;
-  let specialNote = "";
-  if (oppositeGenderParticipants.length > 0) {
-    partnerID = oppositeGenderParticipants[Math.floor(Math.random() * oppositeGenderParticipants.length)];
-  } else {
-    partnerID = participants[Math.floor(Math.random() * participants.length)];
-    specialNote = "\n⚠️ No opposite gender partner found, so a random partner was chosen.";
-  }
-
+  let partnerID = participants[Math.floor(Math.random() * participants.length)];
   let partnerInfo = await api.getUserInfo(partnerID);
   let partnerName = partnerInfo[partnerID].name;
 
@@ -181,7 +162,7 @@ module.exports.run = async function ({ api, event }) {
   let one = senderID, two = partnerID;
   return makeImage({ one, two }).then(path => {
     api.sendMessage({
-      body: `💖 VIP Romantic Pairing 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 Love Compatibility: ${matchRate}\n✨ May your love shine as bright as the stars!${specialNote}`,
+      body: `💖 VIP Romantic Pairing 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 Love Compatibility: ${matchRate}\n✨ May your love shine as bright as the stars!`,
       mentions,
       attachment: fs.createReadStream(path)
     }, threadID, () => fs.unlinkSync(path), messageID);
