@@ -298,16 +298,28 @@ module.exports.run = async function({ api, event, args, Users }) {
       return api.sendMessage("❌ | Use: teach [trigger] - [response1, response2,...]", event.threadID, event.messageID);
     }
     const trigger = parts[0].trim();
-    const responses = parts[1].trim();
-    if (!trigger || !responses) {
+    const responsesText = parts.slice(1).join(" - ").trim();
+    if (!trigger || !responsesText) {
       return api.sendMessage("❌ | Use: teach [trigger] - [response1, response2,...]", event.threadID, event.messageID);
     }
     try {
-      const res = await postTeachWithFallback(base, trigger, responses, uid);
+      const triggerKey = String(trigger).toLowerCase();
+      const responsesArray = responsesText
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+      const payloadResponses = responsesArray.length > 0 ? responsesArray : [responsesText];
+      const res = await postTeachWithFallback(base, triggerKey, payloadResponses, uid);
       return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${res.data.count || 0}`, event.threadID, event.messageID);
     } catch (err) {
       try {
-        const local = await localTeachCreate(trigger, responses, uid);
+        const triggerKey = String(trigger).toLowerCase();
+        const responsesArray = responsesText
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean);
+        const payloadResponses = responsesArray.length > 0 ? responsesArray : [responsesText];
+        const local = await localTeachCreate(triggerKey, payloadResponses, uid);
         return api.sendMessage(`✅ Replies added to "${trigger}"\n• Teacher: ${senderName}\n• Total: ${local.count || 0}`, event.threadID, event.messageID);
       } catch (e2) {
         const e = err.response?.data?.error || err.response?.data?.message || err.message;
