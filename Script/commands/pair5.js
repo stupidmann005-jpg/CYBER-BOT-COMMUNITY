@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "pair5",
-  version: "3.0.0",
+  version: "3.1.0",
   hasPermssion: 0,
   credits: "𝐂𝐘𝐁𝐄𝐑 ☢️ 𖣘 BOT TEAM (Modified by GPT)",
   description: "Pair two users with a romantic heart background (VIP only, square avatars + design + glow)",
@@ -133,6 +133,20 @@ async function isVIP(api, userID) {
   }
 }
 
+// random fancy text templates
+function getStyledMessage(senderName, partnerName, matchRate) {
+  const styles = [
+    `‎💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`,
+    `💖 ＶＩＰ Ｒｏｍａｎｔｉｃ Ｐａｉｒｉｎｇ 💖\n\n💘 ${senderName} ❤ ${partnerName}\n💓 Ｌｏｖｅ Ｃｏｍｐａｔｉｂｉｌｉ𝘁𝘺: ${matchRate}\n✨ Ｗｉｓｈｉｎｇ ｙｏｕ ｅｔｅｒｎａｌ ｌｏｖｅ!`,
+    `💖 𝑉𝐼𝑃 𝑅𝑜𝑚𝑎𝑛𝑡𝑖𝑐 𝑃𝑎𝑖𝑟𝑖𝑛𝑔 💖\n\n💘 ${senderName} 💕 ${partnerName}\n💓 𝐿𝑜𝑣𝑒 𝐶𝑜𝑚𝑝𝑎𝑡𝑖𝑏𝑖𝑙𝑖𝑡𝑦: ${matchRate}\n✨ 𝑀𝑎𝑦 𝑦𝑜𝑢𝑟 ℎ𝑒𝑎𝑟𝑡𝑠 𝑠𝑡𝑎𝑦 𝑎𝑠 𝑜𝑛𝑒!`,
+    `💖 🆅🅸🅿 🆁🅾🅼🅰🅽🆃🅸🅲 🅿🅰🅸🆁🅸🅽🅶 💖\n\n💘 ${senderName} 💘 ${partnerName}\n💓 🅻🅾🆅🅴 🅲🅾🅼🅿🅰🆃🅸🅱🅸🅻🅸🆃🆈: ${matchRate}\n✨ 🅼🅰🆈 🆈🅾🆄🆁 🅻🅾🆅🅴 🆂🅷🅸🅽🅴 🅵🅾🆁🅴🆅🅴🆁!`,
+    `💖 𝓥𝓘𝓟 𝓡𝓸𝓶𝓪𝓷𝓽𝓲𝓬 𝓟𝓪𝓲𝓻𝓲𝓷𝓰 💖\n\n💘 ${senderName} 🤍 ${partnerName}\n💓 𝓛𝓸𝓿𝓮 𝓒𝓸𝓶𝓹𝓪𝓽𝓲𝓫𝓲𝓵𝓲𝓽𝔂: ${matchRate}\n✨ 𝓦𝓲𝓼𝓱𝓲𝓷𝓰 𝔂𝓸𝓾 𝓯𝓸𝓻𝓮𝓿𝓮𝓻 𝓵𝓸𝓿𝓮!`,
+    `💖 ᐯᑎᑭ ᖇOᗰᗩᑎTIᑕ ᑭᗩIᖇIᑎG 💖\n\n💘 ${senderName} 💞 ${partnerName}\n💓 ᒪOᐯE ᑕOᗰᑭᗩTIᗷIᒪITᎩ: ${matchRate}\n✨ ᗰᗩᎩ YOᑌᖇ ᒪOᐯE ᔕᕼIᑎE ᖴOᖇEᐯEᖇ!`
+  ];
+
+  return styles[Math.floor(Math.random() * styles.length)];
+}
+
 module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, senderID } = event;
   const fs = global.nodemodule["fs-extra"];
@@ -145,14 +159,33 @@ module.exports.run = async function ({ api, event }) {
   const percentages = ["21%", "67%", "19%", "37%", "17%", "96%", "52%", "62%", "76%", "83%", "100%", "99%", "0%", "48%"];
   const matchRate = percentages[Math.floor(Math.random() * percentages.length)];
 
+  // sender info
   let senderInfo = await api.getUserInfo(senderID);
   let senderName = senderInfo[senderID].name;
+  let senderGender = senderInfo[senderID].gender || "unknown";
 
+  // thread info
   let threadInfo = await api.getThreadInfo(threadID);
-  let participants = threadInfo.participantIDs.filter(id => id !== senderID);
-  let partnerID = participants[Math.floor(Math.random() * participants.length)];
-  let partnerInfo = await api.getUserInfo(partnerID);
-  let partnerName = partnerInfo[partnerID].name;
+  let candidates = threadInfo.participantIDs.filter(id => id !== senderID);
+  let usersInfo = await api.getUserInfo(...candidates);
+
+  // filter opposite gender
+  let oppositeGenderUsers = candidates.filter(uid => {
+    let g = usersInfo[uid].gender || "unknown";
+    return (senderGender === "male" && g === "female") ||
+           (senderGender === "female" && g === "male");
+  });
+
+  // pick partner
+  let partnerID;
+  if (oppositeGenderUsers.length > 0) {
+    partnerID = oppositeGenderUsers[Math.floor(Math.random() * oppositeGenderUsers.length)];
+  } else {
+    partnerID = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  let partnerInfo = usersInfo[partnerID];
+  let partnerName = partnerInfo.name;
 
   let mentions = [
     { id: senderID, tag: senderName },
@@ -162,8 +195,8 @@ module.exports.run = async function ({ api, event }) {
   let one = senderID, two = partnerID;
   return makeImage({ one, two }).then(path => {
     api.sendMessage({
-      body: `body: `💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`
-,mentions,
+      body: getStyledMessage(senderName, partnerName, matchRate),
+      mentions,
       attachment: fs.createReadStream(path)
     }, threadID, () => fs.unlinkSync(path), messageID);
   });
