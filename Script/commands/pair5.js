@@ -34,7 +34,7 @@ async function ensureBackground() {
   const dir = await ensureCanvasDir();
   const bgPath = path.join(dir, "pair_bg.jpg");
   if (!fs.existsSync(bgPath)) {
-    const url = "https://i.postimg.cc/FRHgxLxh/love-heart-purple-1920x1080-11966.png";
+    const url = "https://i.postimg.cc/Vv85hp8n/background-for-the-festival-of-love-and-valentine-video.png";
     const res = await axios.get(url, { responseType: "arraybuffer", maxRedirects: 5 });
     fs.writeFileSync(bgPath, Buffer.from(res.data));
   }
