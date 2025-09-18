@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "pair5",
-  version: "3.1.0",
+  version: "3.0.0",
   hasPermssion: 0,
   credits: "𝐂𝐘𝐁𝐄𝐑 ☢️ 𖣘 BOT TEAM (Modified by GPT)",
   description: "Pair two users with a romantic heart background (VIP only, square avatars + design + glow)",
