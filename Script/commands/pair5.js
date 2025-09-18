@@ -103,9 +103,9 @@ async function makeImage({ one, two }) {
 
   // glowing effect by duplicating avatars with blur
   const glow = imgOne.clone().resize(200, 200).blur(15);
-  pair_bg.composite(glow, 80, 200, { opacitySource: 0.4 });
+  pair_bg.composite(glow, 90, 90, { opacitySource: 0.4 });
   const glow2 = imgTwo.clone().resize(200, 200).blur(15);
-  pair_bg.composite(glow2, 530, 200, { opacitySource: 0.4 });
+  pair_bg.composite(glow2, 400, 90, { opacitySource: 0.4 });
 
   let raw = await pair_bg.getBufferAsync("image/png");
   fs.writeFileSync(pathImg, raw);
@@ -162,8 +162,8 @@ module.exports.run = async function ({ api, event }) {
   let one = senderID, two = partnerID;
   return makeImage({ one, two }).then(path => {
     api.sendMessage({
-      body: `💖 VIP Romantic Pairing 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 Love Compatibility: ${matchRate}\n✨ May your love shine as bright as the stars!`,
-      mentions,
+      body: `body: `💖 𝗩𝗜𝗣 𝗥𝗼𝗺𝗮𝗻𝘁𝗶𝗰 𝗣𝗮𝗶𝗿𝗶𝗻𝗴 💖\n\n💘 ${senderName} has been paired with ${partnerName}\n💓 𝗟𝗼𝘃𝗲 𝗖𝗼𝗺𝗽𝗮𝘁𝗶𝗯𝗶𝗹𝗶𝘁𝘆: ${matchRate}\n✨ 𝗠𝗮𝘆 𝘆𝗼𝘂𝗿 𝗹𝗼𝘃𝗲 𝘀𝗵𝗶𝗻𝗲 𝗮𝘀 𝗯𝗿𝗶𝗴𝗵𝘁 𝗮𝘀 𝘁𝗵𝗲 𝘀𝘁𝗮𝗿𝘀!`
+,mentions,
       attachment: fs.createReadStream(path)
     }, threadID, () => fs.unlinkSync(path), messageID);
   });
