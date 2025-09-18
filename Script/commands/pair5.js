@@ -5,7 +5,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "pair5",
-  version: "1.2.0",
+  version: "1.2.1",
   hasPermssion: 2, // Admin level by default
   credits: "CYBER TEAM (modified by GPT)",
   description: "VIP-only: Pair two users with a romantic heart background (square avatars with border & shadow, opposite gender pairing)",
@@ -56,8 +56,8 @@ async function prepareAvatar(imagePath, bgWidth = 1200) {
 
   // scale avatar relative to background width
   const size = Math.floor(bgWidth * 0.25); // 25% of background width
-  const borderSize = Math.floor(size * 0.05); // 8% border
-  const shadowOffset = Math.floor(size * 0.05); // 10% shadow offset
+  const borderSize = Math.floor(size * 0.05); // 5% border
+  const shadowOffset = Math.floor(size * 0.05); // 5% shadow offset
 
   avatar.resize(size, size);
 
@@ -119,9 +119,14 @@ module.exports.run = async function ({ api, event, permssion }) {
   const { threadID, messageID, senderID } = event;
 
   // ✅ VIP/Admin check
-  const isVIP = permssion >= 2 || VIP_USERS.includes(senderID);
+  const isVIP = (typeof permssion !== "undefined" && permssion >= 2) || VIP_USERS.includes(senderID);
+
   if (!isVIP) {
-    return api.sendMessage("❌ This command is for VIP users only.", threadID, messageID);
+    return api.sendMessage(
+      "❌ You are not a VIP user.\n👉 This command is available only for VIP users or bot admins.",
+      threadID,
+      messageID
+    );
   }
 
   const percentages = ["21%", "67%", "19%", "37%", "17%", "96%", "52%", "62%", "76%", "83%", "100%", "99%", "0%", "48%"];
