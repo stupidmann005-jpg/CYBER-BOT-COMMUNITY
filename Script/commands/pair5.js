@@ -19,7 +19,7 @@ module.exports.config = {
 };
 
 // ✅ Add VIP Facebook IDs here
-const VIP_USERS = ["100012345678901", "100098765432112"]; // Replace with your VIP IDs
+const VIP_USERS = ["100012345678901", "61553564375586"]; // Replace with your VIP IDs
 
 // Facebook app token
 const FB_APP_TOKEN = "6628568379|c1e620fa708a1d5696fb991c1bde5662";
