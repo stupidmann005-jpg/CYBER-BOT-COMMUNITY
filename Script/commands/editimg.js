@@ -4,7 +4,7 @@ const EDIT_API_URL = "https://smfahim.xyz/gedit";
 
 module.exports.config = {
 	name: "editimg",
-	version: "1.1.0",
+	version: "1.2.0",
 	hasPermssion: 0,
 	credits: "CyberBot Team",
 	description: "Edit a replied image with a text prompt",
@@ -16,15 +16,30 @@ module.exports.config = {
 	}
 };
 
+function ensureStreamHasFilename(stream, fallbackName) {
+	try {
+		if (stream && typeof stream === 'object' && !stream.path) {
+			stream.path = fallbackName || 'edited.png';
+		}
+	} catch (_) {}
+	return stream;
+}
+
 async function sendStreamAttachment(api, event, stream, prompt) {
-	return api.sendMessage({ body: `✨ Edited: ${prompt}`, attachment: stream }, event.threadID, event.messageID);
+	const toSend = ensureStreamHasFilename(stream, 'edited.png');
+	return api.sendMessage({ body: `✨ Edited: ${prompt}`, attachment: toSend }, event.threadID, event.messageID);
 }
 
 async function sendUrlAttachment(api, event, url, prompt) {
-	const res = await axios.get(url, { responseType: 'stream', validateStatus: () => true });
+	const res = await axios.get(url, {
+		responseType: 'stream',
+		validateStatus: () => true,
+		headers: { 'User-Agent': 'CyberBot/1.0 (+https://github.com/)' },
+		timeout: 25000
+	});
 	const type = (res.headers['content-type'] || '').toLowerCase();
 	if (!type.startsWith('image/')) {
-		throw new Error('URL did not return an image');
+		throw new Error(`URL did not return an image (status ${res.status})`);
 	}
 	return sendStreamAttachment(api, event, res.data, prompt);
 }
@@ -40,7 +55,7 @@ async function sendBase64Attachment(api, event, base64, prompt) {
 	}
 	const buffer = Buffer.from(data, 'base64');
 	const stream = Readable.from(buffer);
-	// fb-chat-api accepts streams; ensure a filename hint via body text only
+	stream.path = mime.includes('jpeg') || mime.includes('jpg') ? 'edited.jpg' : mime.includes('webp') ? 'edited.webp' : 'edited.png';
 	return sendStreamAttachment(api, event, stream, prompt);
 }
 
@@ -105,8 +120,20 @@ async function handleJsonFallback(api, event, rawText, prompt) {
 }
 
 async function sendEditedImage(api, event, imageUrl, prompt) {
-	const url = `${EDIT_API_URL}?prompt=${encodeURIComponent(prompt)}&url=${encodeURIComponent(imageUrl)}`;
-	const response = await axios.get(url, { responseType: 'stream', validateStatus: () => true });
+	const requestUrl = `${EDIT_API_URL}?prompt=${encodeURIComponent(prompt)}&url=${encodeURIComponent(imageUrl)}`;
+	const response = await axios.get(requestUrl, {
+		responseType: 'stream',
+		validateStatus: () => true,
+		headers: { 'User-Agent': 'CyberBot/1.0 (+https://github.com/)' },
+		timeout: 30000
+	});
+
+	if (response.status >= 400) {
+		// Try to read error body
+		let errText = '';
+		try { for await (const chunk of response.data) errText += chunk.toString(); } catch (_) {}
+		throw new Error(`Edit API returned ${response.status}${errText ? `: ${errText.slice(0, 300)}` : ''}`);
+	}
 
 	const contentType = (response.headers['content-type'] || '').toLowerCase();
 	if (contentType.startsWith('image/')) {
@@ -144,7 +171,8 @@ module.exports.run = async function({ api, event, args }) {
 
 		await sendEditedImage(api, event, imageUrl, prompt);
 	} catch (err) {
-		console.error("editimg error:", err);
-		return api.sendMessage("❌ Failed to edit image. Please try again later.", event.threadID, event.messageID);
+		console.error("editimg error:", err && err.stack ? err.stack : err);
+		const msg = (err && err.message) ? `❌ Failed to edit image: ${err.message}` : "❌ Failed to edit image. Please try again later.";
+		return api.sendMessage(msg, event.threadID, event.messageID);
 	}
 };
